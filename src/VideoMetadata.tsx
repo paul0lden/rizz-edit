@@ -9,7 +9,7 @@ const VideoMetadata = ({ file }) => {
   React.useEffect(() => {
     if (!file) return;
 
-  console.dir(file)
+    console.dir(file)
 
     const extractMetadata = async () => {
       setIsLoading(true);
@@ -109,23 +109,7 @@ const VideoMetadata = ({ file }) => {
   return (
     <div className="w-full max-w-md bg-white rounded-lg shadow-md overflow-hidden">
 
-        <p className="text-gray-500">No video selected</p>
-        <div className="flex gap-4">
-          <button
-            onClick={() => exportVideo("mp4")}
-            className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
-            disabled={!videoRef.current || isExporting}
-          >
-            Export MP4
-          </button>
-          <button
-            onClick={() => exportVideo("webm")}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            disabled={!videoRef.current || isExporting}
-          >
-            Export WebM
-          </button>
-        </div>
+      <p className="text-gray-500">No video selected</p>
       <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-800">Video Metadata</h3>
       </div>
