@@ -1,42 +1,56 @@
-export const vertexShader = `#version 300 es
-in vec4 position;
-in vec2 texcoord;
-out vec2 v_texCoord;
+export const mainVertexShader = `#version 300 es
+in vec4 a_position;
+in vec2 a_texcoord;
+in vec4 a_color;
+in mat4 a_transform; // instanced transform matrix
+
+uniform mat4 u_projection;
+uniform mat4 u_view;
+
+out vec2 v_texcoord;
+out vec4 v_color;
+out vec4 v_worldPos;
 
 void main() {
-    gl_Position = position * vec4(1, -1, 1, 1);
-    v_texCoord = texcoord;
+    mat4 modelView = u_view * a_transform;
+    gl_Position = u_projection * modelView * a_position;
+    v_texcoord = a_texcoord;
+    v_color = a_color;
+    v_worldPos = a_transform * a_position;
 }`;
 
-export const fragmentShader = `#version 300 es
+export const mainFragmentShader = `#version 300 es
 precision highp float;
 
-in vec2 v_texCoord;
-out vec4 outColor;
+in vec2 v_texcoord;
+in vec4 v_color;
+in vec4 v_worldPos;
 
 uniform sampler2D u_texture;
-uniform float u_brightness;
-uniform float u_contrast;
-uniform float u_saturation;
+uniform float u_time;
+uniform bool u_isControl;
+uniform vec4 u_id; // used for picking
 
-// Helper function to adjust saturation
-vec3 adjustSaturation(vec3 color, float saturation) {
-    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-    return mix(vec3(luminance), color, saturation);
-}
+out vec4 outColor;
 
 void main() {
-    vec4 color = texture(u_texture, v_texCoord);
-    
-    // Apply brightness
-    vec3 rgb = color.rgb + u_brightness;
-    
-    // Apply contrast
-    rgb = (rgb - 0.5) * u_contrast + 0.5;
-    
-    // Apply saturation
-    rgb = adjustSaturation(rgb, u_saturation);
-    
-    // Clamp final color values
-    outColor = vec4(clamp(rgb, 0.0, 1.0), color.a);
+    if (u_isControl) {
+        outColor = v_color;
+    } else {
+        vec4 texColor = texture(u_texture, v_texcoord);
+        outColor = texColor * v_color;
+    }
+}`;
+
+export const pickingFragmentShader = `#version 300 es
+precision highp float;
+
+in vec2 v_texcoord;
+in vec4 v_worldPos;
+
+uniform vec4 u_id;
+out vec4 outColor;
+
+void main() {
+    outColor = u_id; // Output object ID for picking
 }`;
