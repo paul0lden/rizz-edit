@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import * as twgl from "twgl.js";
 import { mat4, vec2 } from "gl-matrix";
 import { VideoTimeline } from "./VideoTimeline";
-import { Transform, VideoClip } from "./types";
+import { HandleType, Transform, VideoClip } from "./types";
 import { TransformSystem } from "./utils/transform";
 import { VideoRenderer } from "./VideoRenderer";
 import { SelectionRenderer } from './SelectionRenderer';
@@ -31,11 +31,12 @@ function App() {
 
   // Drag state
   const dragState = useRef({
-    mode: "none" as "none" | "pan" | "drag",
+    mode: "none" as "none" | "pan" | "drag" | "stretch",
     clipId: null as number | null,
     startPos: vec2.create(),
     startTransform: null as Transform | null,
     currentPos: vec2.create(),
+    activeHandle: HandleType.None,
   });
 
   // Sync clips with ref
