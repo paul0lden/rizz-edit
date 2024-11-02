@@ -1,4 +1,3 @@
-// SelectionRenderer.ts
 import * as twgl from 'twgl.js';
 import { mat4 } from 'gl-matrix';
 import { VideoClip } from './types';
@@ -9,13 +8,9 @@ in vec4 a_position;
 uniform mat4 u_projection;
 uniform mat4 u_view;
 uniform mat4 u_model;
-uniform float u_borderWidth;
 
 void main() {
-    // Add border width to the vertex position
-    vec4 position = a_position;
-    position.xy *= 1.0 + u_borderWidth * 2.0;
-    gl_Position = u_projection * u_view * u_model * position;
+    gl_Position = u_projection * u_view * u_model * a_position;
 }`;
 
 const selectionFragmentShader = `#version 300 es
@@ -23,84 +18,135 @@ precision highp float;
 
 out vec4 outColor;
 
-uniform vec4 u_borderColor;
+uniform vec4 u_color;
 
 void main() {
-    outColor = u_borderColor;
+    outColor = u_color;
 }`;
 
 export class SelectionRenderer {
-  private gl: WebGL2RenderingContext;
-  private programInfo: twgl.ProgramInfo;
-  private bufferInfo: twgl.BufferInfo;
+    private gl: WebGL2RenderingContext;
+    private programInfo: twgl.ProgramInfo;
+    private borderBufferInfo: twgl.BufferInfo;
+    private handleBufferInfo: twgl.BufferInfo;
 
-  constructor(gl: WebGL2RenderingContext) {
-    this.gl = gl;
+    constructor(gl: WebGL2RenderingContext) {
+        this.gl = gl;
+        
+        // Create shader program
+        this.programInfo = twgl.createProgramInfo(gl, [
+            selectionVertexShader,
+            selectionFragmentShader
+        ]);
 
-    // Create shader program for selection border
-    this.programInfo = twgl.createProgramInfo(gl, [
-      selectionVertexShader,
-      selectionFragmentShader
-    ]);
+        // Create border vertices (just the outline)
+        const borderArrays = {
+            a_position: {
+                numComponents: 3,
+                data: [
+                    -1, -1, 0,  // Bottom left
+                     1, -1, 0,  // Bottom right
+                     1,  1, 0,  // Top right
+                    -1,  1, 0,  // Top left
+                ],
+            },
+            indices: [
+                0, 1,  // Bottom
+                1, 2,  // Right
+                2, 3,  // Top
+                3, 0,  // Left
+            ],
+        };
 
-    // Create a wireframe rectangle for the border
-    const arrays = {
-      a_position: {
-        numComponents: 3,
-        data: [
-          // Outer rectangle
-          -1, -1, 0,
-          1, -1, 0,
-          1, 1, 0,
-          -1, 1, 0,
-        ],
-      },
-      indices: [
-        0, 1, 1, 2, 2, 3, 3, 0, // Border lines
-      ],
-    };
+        // Create handle vertices (8 small squares)
+        const handleSize = 0.02; // Size of the handle squares
+        const handles = [];
+        const handlePositions = [
+            [-1, -1], // Bottom-left
+            [ 0, -1], // Bottom-middle
+            [ 1, -1], // Bottom-right
+            [ 1,  0], // Middle-right
+            [ 1,  1], // Top-right
+            [ 0,  1], // Top-middle
+            [-1,  1], // Top-left
+            [-1,  0], // Middle-left
+        ];
 
-    this.bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
-  }
+        handlePositions.forEach(([x, y]) => {
+            handles.push(
+                x - handleSize, y - handleSize, 0,
+                x + handleSize, y - handleSize, 0,
+                x + handleSize, y + handleSize, 0,
+                x - handleSize, y + handleSize, 0,
+            );
+        });
 
-  render(clip: VideoClip, camera: { projection: mat4; view: mat4 }) {
-    const gl = this.gl;
-    
-    gl.useProgram(this.programInfo.program);
+        const handleArrays = {
+            a_position: {
+                numComponents: 3,
+                data: handles,
+            },
+            indices: Array.from({ length: 8 }, (_, i) => {
+                const base = i * 4;
+                return [
+                    base, base + 1, base + 2,
+                    base, base + 2, base + 3,
+                ];
+            }).flat(),
+        };
 
-    // Save WebGL state
-    const previousLineWidth = gl.getParameter(gl.LINE_WIDTH);
-    
-    // Set line parameters
-    gl.lineWidth(2);  // You might need to adjust this value
+        this.borderBufferInfo = twgl.createBufferInfoFromArrays(gl, borderArrays);
+        this.handleBufferInfo = twgl.createBufferInfoFromArrays(gl, handleArrays);
+    }
 
-    const model = mat4.create();
-    mat4.translate(model, model, clip.transform.translation);
-    mat4.rotateX(model, model, clip.transform.rotation[0]);
-    mat4.rotateY(model, model, clip.transform.rotation[1]);
-    mat4.rotateZ(model, model, clip.transform.rotation[2]);
-    mat4.scale(model, model, clip.transform.scale);
+    render(clip: VideoClip, camera: { projection: mat4; view: mat4 }) {
+        const gl = this.gl;
+        
+        gl.useProgram(this.programInfo.program);
 
-    const uniforms = {
-        u_projection: camera.projection,
-        u_view: camera.view,
-        u_model: model,
-        u_borderColor: [0.0, 1.0, 1.0, 1.0],  // Bright cyan for better visibility
-        u_borderWidth: 0.02,
-    };
+        // Enable blending for transparent effects
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    // Enable necessary GL state
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        // Create model matrix from transform
+        const model = mat4.create();
+        mat4.translate(model, model, clip.transform.translation);
+        mat4.rotateX(model, model, clip.transform.rotation[0]);
+        mat4.rotateY(model, model, clip.transform.rotation[1]);
+        mat4.rotateZ(model, model, clip.transform.rotation[2]);
+        mat4.scale(model, model, clip.transform.scale);
 
-    twgl.setBuffersAndAttributes(gl, this.programInfo, this.bufferInfo);
-    twgl.setUniforms(this.programInfo, uniforms);
-    
-    // Draw the selection border
-    gl.drawElements(gl.LINES, 8, gl.UNSIGNED_SHORT, 0);
+        const uniforms = {
+            u_projection: camera.projection,
+            u_view: camera.view,
+            u_model: model,
+            u_color: [0.2, 0.6, 1.0, 1.0], // Photoshop-like blue
+        };
 
-    // Restore previous state
-    gl.lineWidth(previousLineWidth);
-    gl.disable(gl.BLEND);
-  }
+        // Draw border
+        gl.lineWidth(1);
+        twgl.setBuffersAndAttributes(gl, this.programInfo, this.borderBufferInfo);
+        twgl.setUniforms(this.programInfo, uniforms);
+        gl.drawElements(gl.LINES, 8, gl.UNSIGNED_SHORT, 0);
+
+        // Draw handles
+        twgl.setBuffersAndAttributes(gl, this.programInfo, this.handleBufferInfo);
+        twgl.setUniforms(this.programInfo, {
+            ...uniforms,
+            u_color: [1, 1, 1, 1], // White fill for handles
+        });
+        gl.drawElements(gl.TRIANGLES, 48, gl.UNSIGNED_SHORT, 0);
+
+        // Draw handle borders
+        twgl.setUniforms(this.programInfo, {
+            ...uniforms,
+            u_color: [0.2, 0.6, 1.0, 1.0], // Blue border for handles
+        });
+        for (let i = 0; i < 8; i++) {
+            const offset = i * 4;
+            gl.drawArrays(gl.LINE_LOOP, offset, 4);
+        }
+
+        gl.disable(gl.BLEND);
+    }
 }

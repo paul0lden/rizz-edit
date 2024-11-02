@@ -59,3 +59,17 @@ export interface DragState {
   startPos: vec2 | null;
   startTransform: Transform | null;
 }
+
+export enum HandleType {
+  TopLeft,
+  Top,
+  TopRight,
+  Right,
+  BottomRight,
+  Bottom,
+  BottomLeft,
+  Left,
+  None
+}
+
+export type TransformMode = "none" | "pan" | "drag" | "stretch";
