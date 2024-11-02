@@ -5,7 +5,7 @@ import { VideoTimeline } from "./VideoTimeline";
 import { HandleType, Transform, VideoClip } from "./types";
 import { TransformSystem } from "./utils/transform";
 import { VideoRenderer } from "./VideoRenderer";
-import { SelectionRenderer } from './SelectionRenderer';
+import { getHandleAtPosition, SelectionRenderer } from './SelectionRenderer';
 import { Play, Pause } from "lucide-react";
 import { Camera } from "./Camera";
 
@@ -155,6 +155,26 @@ function App() {
 
     // Handle left click
     if (e.button === 0) {
+
+      if (selectedClipId !== null) {
+        const selectedClip = clipsRef.current.find(clip => clip.id === selectedClipId);
+        if (selectedClip) {
+          const handle = getHandleAtPosition(vec2.fromValues(pos.x, pos.y), selectedClip);
+          if (handle !== HandleType.None) {
+            dragState.current = {
+              mode: "stretch",
+              clipId: selectedClipId,
+              startPos: vec2.fromValues(pos.x, pos.y),
+              startTransform: { ...selectedClip.transform },
+              currentPos: vec2.fromValues(pos.x, pos.y),
+              activeHandle: handle
+            };
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+
       let hitClip = false;
 
       // Hit test all clips in reverse order (top to bottom)
@@ -240,6 +260,83 @@ function App() {
         state.startTransform.translation[1] + dy,
         0,
       ];
+      needsRenderRef.current = true;
+    } else if (state.mode === "stretch" && state.clipId !== null && state.startTransform) {
+      const clip = clipsRef.current.find(c => c.id === state.clipId);
+      if (!clip) return;
+
+      // Get the original position and dimensions
+      const [tx, ty] = state.startTransform.translation;
+      const [origWidth, origHeight] = state.startTransform.scale;
+
+      switch (state.activeHandle) {
+        case HandleType.TopRight: {
+          // Already working - our reference
+          const fixedCornerX = tx - origWidth;
+          const fixedCornerY = ty - origHeight;
+          const newWidth = Math.abs(pos.x - fixedCornerX);
+          const newHeight = Math.abs(pos.y - fixedCornerY);
+          clip.transform.scale = [newWidth / 2, newHeight / 2, 1];
+          break;
+        }
+        case HandleType.Right: {
+          // Already working
+          const fixedEdgeX = tx - origWidth;
+          const newWidth = Math.abs(pos.x - fixedEdgeX);
+          clip.transform.scale = [newWidth / 2, origHeight, 1];
+          break;
+        }
+        case HandleType.Top: {
+          // Already working
+          const fixedEdgeY = ty - origHeight;
+          const newHeight = Math.abs(pos.y - fixedEdgeY);
+          clip.transform.scale = [origWidth, newHeight / 2, 1];
+          break;
+        }
+        case HandleType.BottomRight: {
+          // Already working
+          const fixedCornerX = tx - origWidth;
+          const fixedCornerY = ty + origHeight;
+          const newWidth = Math.abs(pos.x - fixedCornerX);
+          const newHeight = Math.abs(pos.y - fixedCornerY);
+          clip.transform.scale = [newWidth / 2, newHeight / 2, 1];
+          break;
+        }
+        case HandleType.TopLeft: {
+          // Fixed point is bottom-right corner
+          const fixedCornerX = tx + origWidth;
+          const fixedCornerY = ty - origHeight;
+          const newWidth = Math.abs(pos.x - fixedCornerX);
+          const newHeight = Math.abs(pos.y - fixedCornerY);
+          clip.transform.scale = [newWidth / 2, newHeight / 2, 1];
+          break;
+        }
+        case HandleType.Left: {
+          // Fixed point is right edge
+          const fixedEdgeX = tx + origWidth;
+          const newWidth = Math.abs(pos.x - fixedEdgeX);
+          clip.transform.scale = [newWidth / 2, origHeight, 1];
+          break;
+        }
+
+        case HandleType.BottomLeft: {
+          // Fixed point is top-right corner
+          const fixedCornerX = tx + origWidth;
+          const fixedCornerY = ty + origHeight;
+          const newWidth = Math.abs(pos.x - fixedCornerX);
+          const newHeight = Math.abs(pos.y - fixedCornerY);
+          clip.transform.scale = [newWidth / 2, newHeight / 2, 1];
+          break;
+        }
+        case HandleType.Bottom: {
+          // Fixed point is top edge
+          const fixedEdgeY = ty + origHeight;
+          const newHeight = Math.abs(pos.y - fixedEdgeY);
+          clip.transform.scale = [origWidth, newHeight / 2, 1];
+          break;
+        }
+      }
+
       needsRenderRef.current = true;
     }
   }, [updateMousePosition]);
