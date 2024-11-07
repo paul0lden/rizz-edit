@@ -2,33 +2,10 @@ import * as twgl from 'twgl.js';
 import { mat4 } from 'gl-matrix';
 import { HandleType, VideoClip } from './types';
 
-const selectionVertexShader = `#version 300 es
-in vec4 a_position;
-
-uniform mat4 u_projection;
-uniform mat4 u_view;
-uniform mat4 u_model;
-
-void main() {
-    gl_Position = u_projection * u_view * u_model * a_position;
-}`;
-
-const selectionFragmentShader = `#version 300 es
-precision highp float;
-
-out vec4 outColor;
-
-uniform vec4 u_color;
-
-void main() {
-    outColor = u_color;
-}`;
 
 export class SelectionRenderer {
   private gl: WebGL2RenderingContext;
   private programInfo: twgl.ProgramInfo;
-  private borderBufferInfo: twgl.BufferInfo;
-  private handleBufferInfo: twgl.BufferInfo;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -120,12 +97,16 @@ export class SelectionRenderer {
       u_projection: camera.projection,
       u_view: camera.view,
       u_model: model,
-      u_color: [0.2, 0.6, 1.0, 1.0], // Photoshop-like blue
+      u_color: [0.2, 0.6, 1.0, 1.0], // photoshop-like blue
     };
 
     // Draw border
     gl.lineWidth(1);
-    twgl.setBuffersAndAttributes(gl, this.programInfo, this.borderBufferInfo);
+    twgl.setBuffersAndAttributes(
+      gl,
+      this.programInfo,
+      this.borderBufferInfo,
+    );
     twgl.setUniforms(this.programInfo, uniforms);
     gl.drawElements(gl.LINES, 8, gl.UNSIGNED_SHORT, 0);
 
