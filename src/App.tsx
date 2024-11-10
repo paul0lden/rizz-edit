@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as twgl from "twgl.js";
-import { vec2 } from "gl-matrix";
-import { VideoTimeline } from "./VideoTimeline";
-import { HandleType, Transform, VideoClip } from "./types";
-import { TransformSystem } from "./utils/transform";
-import { VideoRenderer } from "./VideoRenderer";
-import { getHandleAtPosition, SelectionRenderer } from "./SelectionRenderer";
 import { Play, Pause } from "lucide-react";
-import VideoEditor from "./VideoEditor";
+
+import { VideoClip } from "./types";
+import { TransformSystem } from "./utils/transform";
+import { VideoRenderer } from "./components/Editor/VideoRenderer";
+import { VideoTimeline } from "./components/Timeline";
+import VideoEditor from "./components/Editor";
 
 function App() {
   // State
@@ -26,8 +25,6 @@ function App() {
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const needsRenderRef = useRef(false);
-
-  // Drag state
 
   // Sync clips with ref
   useEffect(() => {

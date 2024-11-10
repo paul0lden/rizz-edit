@@ -1,10 +1,8 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef } from "react";
 import { Play, Pause } from "lucide-react";
-import { ViewportControls } from "./Viewport";
-import { TransformControls } from "./TransformControls";
-import { HandleType, TimelineObject, Transform, Viewport } from "./types";
+import { HandleType, Transform } from "../../types";
 import { vec2 } from "gl-matrix";
-import { getHandleAtPosition } from "./SelectionRenderer";
+import { getHandleAtPosition } from "./misc";
 
 const VideoEditor: React.FC<any> = ({
   canvasRef,
@@ -305,12 +303,13 @@ const VideoEditor: React.FC<any> = ({
     <canvas
       ref={canvasRef}
       className={`w-full h-full bg-gray-900 rounded-lg 
-            ${dragState.current.mode === "pan"
-          ? "cursor-grabbing"
-          : dragState.current.mode === "drag"
-            ? "cursor-move"
-            : "cursor-grab"
-        }`}
+            ${
+              dragState.current.mode === "pan"
+                ? "cursor-grabbing"
+                : dragState.current.mode === "drag"
+                  ? "cursor-move"
+                  : "cursor-grab"
+            }`}
       width={1920}
       height={1080}
       onPointerDown={handleMouseDown}

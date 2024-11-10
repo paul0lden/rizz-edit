@@ -1,6 +1,6 @@
 import * as twgl from 'twgl.js';
 import { mat4 } from 'gl-matrix';
-import { VideoClip } from './types';
+import type { VideoClip } from '../../types';
 import { Camera } from './Camera';
 
 const videoVertexShader = `#version 300 es
@@ -204,8 +204,6 @@ export class VideoRenderer {
       u_color: [0.2, 0.6, 1.0, 1.0], // photoshop-like blue
     };
 
-
-
     if (clip.id === selected?.id) {
       gl.useProgram(this.selectionProgramInfo.program)
       // Draw border
@@ -238,6 +236,5 @@ export class VideoRenderer {
 
       gl.disable(gl.BLEND);
     }
-
   }
 }

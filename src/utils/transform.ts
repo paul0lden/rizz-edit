@@ -1,4 +1,8 @@
-import { mainFragmentShader, mainVertexShader, pickingFragmentShader } from "../shaders";
+import {
+  mainFragmentShader,
+  mainVertexShader,
+  pickingFragmentShader,
+} from "./shaders";
 import { TimelineObject, Transform, Viewport } from "../types";
 import { mat4, vec4 } from "gl-matrix";
 
@@ -137,218 +141,242 @@ export function worldToScreen(
   return { x, y };
 }
 
-export function screenToWorld(
-  screenX: number,
-  screenY: number,
-  viewport: Viewport
-): { x: number; y: number } {
-  const x = (screenX - viewport.width / 2) / viewport.zoom + viewport.x;
-  const y = (screenY - viewport.height / 2) / viewport.zoom + viewport.y;
-  return { x, y };
-}
-
 export class TransformSystem {
-    private gl: WebGL2RenderingContext;
-    private mainProgram: WebGLProgram;
-    private pickingProgram: WebGLProgram;
-    private framebuffer: WebGLFramebuffer;
-    private pickingTexture: WebGLTexture;
-    private handleVAO: WebGLVertexArrayObject;
-    private handleBuffer: WebGLBuffer;
-    private handleInstanceBuffer: WebGLBuffer;
-    private transformData: Float32Array;
-    private readonly MAX_HANDLES = 100; // Maximum number of transform handles
+  private gl: WebGL2RenderingContext;
+  private mainProgram: WebGLProgram;
+  private pickingProgram: WebGLProgram;
+  private framebuffer: WebGLFramebuffer;
+  private pickingTexture: WebGLTexture;
+  private handleVAO: WebGLVertexArrayObject;
+  private handleBuffer: WebGLBuffer;
+  private handleInstanceBuffer: WebGLBuffer;
+  private transformData: Float32Array;
+  private readonly MAX_HANDLES = 100; // Maximum number of transform handles
 
-    constructor(gl: WebGL2RenderingContext) {
-        this.gl = gl;
-        
-        // Create shader programs
-        this.mainProgram = this.createProgram(mainVertexShader, mainFragmentShader);
-        this.pickingProgram = this.createProgram(mainVertexShader, pickingFragmentShader);
-        
-        // Initialize transform data array (16 floats per matrix * max handles)
-        this.transformData = new Float32Array(16 * this.MAX_HANDLES);
-        
-        // Setup buffers and VAO
-        this.setupBuffers();
-        this.setupFramebuffer();
+  constructor(gl: WebGL2RenderingContext) {
+    this.gl = gl;
+
+    // Create shader programs
+    this.mainProgram = this.createProgram(mainVertexShader, mainFragmentShader);
+    this.pickingProgram = this.createProgram(
+      mainVertexShader,
+      pickingFragmentShader
+    );
+
+    // Initialize transform data array (16 floats per matrix * max handles)
+    this.transformData = new Float32Array(16 * this.MAX_HANDLES);
+
+    // Setup buffers and VAO
+    this.setupBuffers();
+    this.setupFramebuffer();
+  }
+
+  private setupBuffers() {
+    const gl = this.gl;
+
+    // Create and bind VAO
+    this.handleVAO = gl.createVertexArray()!;
+    gl.bindVertexArray(this.handleVAO);
+
+    // Create and populate vertex buffer
+    this.handleBuffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleBuffer);
+
+    // Handle geometry (simple quad)
+    const vertices = new Float32Array([
+      // positions (XY),   texcoords (UV)
+      -0.5,
+      -0.5,
+      0.0,
+      0.0, // bottom left
+      0.5,
+      -0.5,
+      1.0,
+      0.0, // bottom right
+      -0.5,
+      0.5,
+      0.0,
+      1.0, // top left
+      0.5,
+      0.5,
+      1.0,
+      1.0, // top right
+    ]);
+
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    // Set up vertex attributes
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0); // position
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 16, 8); // texcoord
+
+    // Create and set up instance buffer for transforms
+    this.handleInstanceBuffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleInstanceBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, this.transformData, gl.DYNAMIC_DRAW);
+
+    // Set up instance attributes (mat4)
+    for (let i = 0; i < 4; i++) {
+      const loc = 2 + i; // Starting from attribute location 2
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 64, i * 16);
+      gl.vertexAttribDivisor(loc, 1); // This is an instanced attribute
     }
 
-    private setupBuffers() {
-        const gl = this.gl;
-
-        // Create and bind VAO
-        this.handleVAO = gl.createVertexArray()!;
-        gl.bindVertexArray(this.handleVAO);
-
-        // Create and populate vertex buffer
-        this.handleBuffer = gl.createBuffer()!;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.handleBuffer);
-
-        // Handle geometry (simple quad)
-        const vertices = new Float32Array([
-            // positions (XY),   texcoords (UV)
-            -0.5, -0.5,         0.0, 0.0,    // bottom left
-             0.5, -0.5,         1.0, 0.0,    // bottom right
-            -0.5,  0.5,         0.0, 1.0,    // top left
-             0.5,  0.5,         1.0, 1.0,    // top right
-        ]);
-        
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-        // Set up vertex attributes
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0); // position
-        gl.enableVertexAttribArray(1);
-        gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 16, 8); // texcoord
-
-        // Create and set up instance buffer for transforms
-        this.handleInstanceBuffer = gl.createBuffer()!;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.handleInstanceBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this.transformData, gl.DYNAMIC_DRAW);
-
-        // Set up instance attributes (mat4)
-        for (let i = 0; i < 4; i++) {
-            const loc = 2 + i; // Starting from attribute location 2
-            gl.enableVertexAttribArray(loc);
-            gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 64, i * 16);
-            gl.vertexAttribDivisor(loc, 1); // This is an instanced attribute
-        }
-
-        // Initialize transform data with identity matrices
-        for (let i = 0; i < this.MAX_HANDLES; i++) {
-            const offset = i * 16;
-            mat4.identity(this.transformData.subarray(offset, offset + 16));
-        }
-
-        // Upload initial data
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.transformData);
-
-        // Unbind VAO
-        gl.bindVertexArray(null);
+    // Initialize transform data with identity matrices
+    for (let i = 0; i < this.MAX_HANDLES; i++) {
+      const offset = i * 16;
+      mat4.identity(this.transformData.subarray(offset, offset + 16));
     }
 
-    private setupFramebuffer() {
-        const gl = this.gl;
-        
-        this.framebuffer = gl.createFramebuffer()!;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-        
-        this.pickingTexture = gl.createTexture()!;
-        gl.bindTexture(gl.TEXTURE_2D, this.pickingTexture);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            gl.RGBA,
-            gl.canvas.width,
-            gl.canvas.height,
-            0,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
-            null
-        );
-        
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        
-        gl.framebufferTexture2D(
-            gl.FRAMEBUFFER,
-            gl.COLOR_ATTACHMENT0,
-            gl.TEXTURE_2D,
-            this.pickingTexture,
-            0
-        );
-        
-        // Reset bindings
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.bindTexture(gl.TEXTURE_2D, null);
+    // Upload initial data
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.transformData);
+
+    // Unbind VAO
+    gl.bindVertexArray(null);
+  }
+
+  private setupFramebuffer() {
+    const gl = this.gl;
+
+    this.framebuffer = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+
+    this.pickingTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.pickingTexture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      gl.canvas.width,
+      gl.canvas.height,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      null
+    );
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      this.pickingTexture,
+      0
+    );
+
+    // Reset bindings
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  }
+
+  public updateTransform(handleId: number, transform: mat4) {
+    if (handleId >= this.MAX_HANDLES) return;
+
+    const gl = this.gl;
+    const offset = handleId * 16;
+
+    // Update local data
+    this.transformData.set(transform, offset);
+
+    // Update GPU buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.handleInstanceBuffer);
+    gl.bufferSubData(
+      gl.ARRAY_BUFFER,
+      offset * 4,
+      this.transformData.subarray(offset, offset + 16)
+    );
+  }
+
+  public render(camera: { projection: mat4; view: mat4 }) {
+    const gl = this.gl;
+
+    gl.useProgram(this.mainProgram);
+    gl.bindVertexArray(this.handleVAO);
+
+    // Set uniforms
+    const projectionLoc = gl.getUniformLocation(
+      this.mainProgram,
+      "u_projection"
+    );
+    const viewLoc = gl.getUniformLocation(this.mainProgram, "u_view");
+
+    gl.uniformMatrix4fv(projectionLoc, false, camera.projection);
+    gl.uniformMatrix4fv(viewLoc, false, camera.view);
+
+    // Draw instances
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, 8); // 8 handles per transform gizmo
+  }
+
+  public pick(x: number, y: number): number {
+    const gl = this.gl;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(this.pickingProgram);
+    gl.bindVertexArray(this.handleVAO);
+
+    // Set uniforms same as main render
+    const projectionLoc = gl.getUniformLocation(
+      this.pickingProgram,
+      "u_projection"
+    );
+    const viewLoc = gl.getUniformLocation(this.pickingProgram, "u_view");
+
+    gl.uniformMatrix4fv(projectionLoc, false, mat4.create());
+    gl.uniformMatrix4fv(viewLoc, false, mat4.create());
+
+    // Draw for picking
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, 8);
+
+    // Read pixel
+    const pixel = new Uint8Array(4);
+    gl.readPixels(
+      x,
+      gl.canvas.height - y,
+      1,
+      1,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      pixel
+    );
+
+    // Reset framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return pixel[0] + (pixel[1] << 8);
+  }
+
+  private createProgram(
+    vertexSource: string,
+    fragmentSource: string
+  ): WebGLProgram {
+    const gl = this.gl;
+    const program = gl.createProgram()!;
+
+    const vs = gl.createShader(gl.VERTEX_SHADER)!;
+    gl.shaderSource(vs, vertexSource);
+    gl.compileShader(vs);
+
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(fs, fragmentSource);
+    gl.compileShader(fs);
+
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error("Program link failed: " + gl.getProgramInfoLog(program));
     }
 
-    public updateTransform(handleId: number, transform: mat4) {
-        if (handleId >= this.MAX_HANDLES) return;
-
-        const gl = this.gl;
-        const offset = handleId * 16;
-
-        // Update local data
-        this.transformData.set(transform, offset);
-
-        // Update GPU buffer
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.handleInstanceBuffer);
-        gl.bufferSubData(gl.ARRAY_BUFFER, offset * 4, 
-            this.transformData.subarray(offset, offset + 16));
-    }
-
-    public render(camera: { projection: mat4; view: mat4 }) {
-        const gl = this.gl;
-        
-        gl.useProgram(this.mainProgram);
-        gl.bindVertexArray(this.handleVAO);
-
-        // Set uniforms
-        const projectionLoc = gl.getUniformLocation(this.mainProgram, 'u_projection');
-        const viewLoc = gl.getUniformLocation(this.mainProgram, 'u_view');
-        
-        gl.uniformMatrix4fv(projectionLoc, false, camera.projection);
-        gl.uniformMatrix4fv(viewLoc, false, camera.view);
-
-        // Draw instances
-        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, 8); // 8 handles per transform gizmo
-    }
-
-    public pick(x: number, y: number): number {
-        const gl = this.gl;
-        
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-        
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        
-        gl.useProgram(this.pickingProgram);
-        gl.bindVertexArray(this.handleVAO);
-        
-        // Set uniforms same as main render
-        const projectionLoc = gl.getUniformLocation(this.pickingProgram, 'u_projection');
-        const viewLoc = gl.getUniformLocation(this.pickingProgram, 'u_view');
-        
-        gl.uniformMatrix4fv(projectionLoc, false, mat4.create());
-        gl.uniformMatrix4fv(viewLoc, false, mat4.create());
-        
-        // Draw for picking
-        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, 8);
-        
-        // Read pixel
-        const pixel = new Uint8Array(4);
-        gl.readPixels(x, gl.canvas.height - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-        
-        // Reset framebuffer
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        
-        return pixel[0] + (pixel[1] << 8);
-    }
-
-    private createProgram(vertexSource: string, fragmentSource: string): WebGLProgram {
-        const gl = this.gl;
-        const program = gl.createProgram()!;
-        
-        const vs = gl.createShader(gl.VERTEX_SHADER)!;
-        gl.shaderSource(vs, vertexSource);
-        gl.compileShader(vs);
-        
-        const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
-        gl.shaderSource(fs, fragmentSource);
-        gl.compileShader(fs);
-        
-        gl.attachShader(program, vs);
-        gl.attachShader(program, fs);
-        gl.linkProgram(program);
-        
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            throw new Error('Program link failed: ' + gl.getProgramInfoLog(program));
-        }
-        
-        return program;
-    }
+    return program;
+  }
 }
-
