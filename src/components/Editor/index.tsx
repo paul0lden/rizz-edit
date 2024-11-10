@@ -303,13 +303,12 @@ const VideoEditor: React.FC<any> = ({
     <canvas
       ref={canvasRef}
       className={`w-full h-full bg-gray-900 rounded-lg 
-            ${
-              dragState.current.mode === "pan"
-                ? "cursor-grabbing"
-                : dragState.current.mode === "drag"
-                  ? "cursor-move"
-                  : "cursor-grab"
-            }`}
+            ${dragState.current.mode === "pan"
+          ? "cursor-grabbing"
+          : dragState.current.mode === "drag"
+            ? "cursor-move"
+            : "cursor-grab"
+        }`}
       width={1920}
       height={1080}
       onPointerDown={handleMouseDown}

@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { motion } from "framer-motion";
 import type { VideoClip } from "../../types";
 import { Plus, X, Video, Box, Code, Settings } from "lucide-react";
+import { useClips } from "../../store/clips";
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -19,15 +20,14 @@ interface VideoTimelineProps {
 }
 
 export const VideoTimeline: React.FC<VideoTimelineProps> = ({
-  clips,
   currentTime,
-  onAddClip,
   onTimeUpdate,
   selectedClipId,
   onClipSelect,
 }) => {
+  const store = useClips();
   const timelineRef = useRef<HTMLDivElement>(null);
-  const duration = clips.reduce(
+  const duration = store.clips.reduce(
     (max, clip) => Math.max(max, clip.startTime + clip.duration),
     0
   );
@@ -52,7 +52,7 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
               accept="video/*"
               className="hidden"
               onChange={(e) =>
-                e.target.files?.[0] && onAddClip(e.target.files[0])
+                e.target.files?.[0] && store.addClip(e.target.files[0])
               }
             />
           </label>
@@ -67,11 +67,12 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
         className="relative h-20 bg-gray-700 rounded cursor-pointer"
         onClick={handleTimelineClick}
       >
-        {clips.map((clip) => (
+        {store.clips.map((clip) => (
           <div
             key={clip.id}
-            className={`absolute h-full rounded transition-colors ${selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
-              }`}
+            className={`absolute h-full rounded transition-colors ${
+              selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
+            }`}
             style={{
               left: `${(clip.startTime / duration) * 100}%`,
               width: `${(clip.duration / duration) * 100}%`,

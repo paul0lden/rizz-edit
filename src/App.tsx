@@ -9,12 +9,12 @@ import { VideoTimeline } from "./components/Timeline";
 import VideoEditor from "./components/Editor";
 
 function App() {
-  // State
+  // review those as well, extract
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedClipId, setSelectedClipId] = useState<number | null>(null);
   const [clipsList, setClipsList] = useState<VideoClip[]>([]);
 
-  // Refs
+  // review all of thsose
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext | null>(null);
   const videoRendererRef = useRef<VideoRenderer | null>(null);
@@ -26,12 +26,12 @@ function App() {
   const lastFrameTimeRef = useRef<number>(0);
   const needsRenderRef = useRef(false);
 
-  // Sync clips with ref
+  // should not be usedd 
   useEffect(() => {
     clipsRef.current = clipsList;
   }, [clipsList]);
 
-  // Initialize WebGL and renderers
+  // go off to component
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -47,13 +47,6 @@ function App() {
     videoRendererRef.current = new VideoRenderer(gl);
     transformSystemRef.current = new TransformSystem(gl);
 
-    //try {
-    //  selectionRendererRef.current = new SelectionRenderer(gl);
-    //  console.log('SelectionRenderer initialized');
-    //} catch (error) {
-    //  console.error('SelectionRenderer initialization failed:', error);
-    //}
-
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     return () => {
@@ -63,7 +56,7 @@ function App() {
     };
   }, []);
 
-  // Render frame function
+  // extract 
   const renderFrame = useCallback(() => {
     const gl = glRef.current;
     const videoRenderer = videoRendererRef.current;
@@ -94,17 +87,9 @@ function App() {
       );
       videoRenderer.render(clip, selectedClip);
     });
-
-    // Render selection if needed
-    //if (selectedClipId !== null) {
-    //  const selectedClip = clipsRef.current.find(clip => clip.id === selectedClipId);
-    //  if (selectedClip) {
-    //    selectionRenderer.render(selectedClip);
-    //  }
-    //}
   }, [isPlaying, selectedClipId]);
 
-  // Animation loop
+  // belongs to renderer 
   useEffect(() => {
     const animate = (now: number) => {
       if (!lastFrameTimeRef.current) {
@@ -157,7 +142,7 @@ function App() {
     };
   }, [isPlaying, renderFrame, selectedClipId]);
 
-  // Handle video playback state
+  // shared state should use store 
   useEffect(() => {
     const videos = videoRefs.current;
 
@@ -176,7 +161,7 @@ function App() {
     }
   }, [isPlaying]);
 
-  // Add clip handler
+  // shared - should be handled by timeline
   const handleAddClip = useCallback(async (file: File) => {
     const gl = glRef.current;
 
@@ -248,7 +233,7 @@ function App() {
     }
   }, []);
 
-  // Time update handler
+  // shared - should be handled by timeline
   const handleTimeUpdate = useCallback((time: number) => {
     currentTimeRef.current = time;
     clipsRef.current.forEach((clip) => {
@@ -264,7 +249,7 @@ function App() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 p-4 w-lvw h-lvh dark:bg-gray-950">
       <div className="relative w-full aspect-video">
         <VideoEditor
           canvasRef={canvasRef}
