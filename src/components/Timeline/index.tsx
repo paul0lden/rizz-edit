@@ -11,9 +11,7 @@ function formatTime(seconds: number): string {
 }
 
 interface VideoTimelineProps {
-  clips: VideoClip[];
   currentTime: number;
-  onAddClip: (file: File) => void;
   onTimeUpdate: (time: number) => void;
   selectedClipId: number | null;
   onClipSelect: (id: number | null) => void;

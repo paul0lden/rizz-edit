@@ -8,6 +8,8 @@ import { VideoRenderer } from "./components/Editor/VideoRenderer";
 import { VideoTimeline } from "./components/Timeline";
 import VideoEditor from "./components/Editor";
 
+import MediaWorker from './media/mediaWorker?worker';
+
 function App() {
   // review those as well, extract
   const [isPlaying, setIsPlaying] = useState(false);
@@ -26,7 +28,7 @@ function App() {
   const lastFrameTimeRef = useRef<number>(0);
   const needsRenderRef = useRef(false);
 
-  // should not be usedd 
+  // should not be usedd
   useEffect(() => {
     clipsRef.current = clipsList;
   }, [clipsList]);
@@ -56,7 +58,7 @@ function App() {
     };
   }, []);
 
-  // extract 
+  // extract
   const renderFrame = useCallback(() => {
     const gl = glRef.current;
     const videoRenderer = videoRendererRef.current;
@@ -89,7 +91,7 @@ function App() {
     });
   }, [isPlaying, selectedClipId]);
 
-  // belongs to renderer 
+  // belongs to renderer
   useEffect(() => {
     const animate = (now: number) => {
       if (!lastFrameTimeRef.current) {
@@ -142,7 +144,7 @@ function App() {
     };
   }, [isPlaying, renderFrame, selectedClipId]);
 
-  // shared state should use store 
+  // shared state should use store
   useEffect(() => {
     const videos = videoRefs.current;
 
@@ -248,6 +250,25 @@ function App() {
     needsRenderRef.current = true;
   }, []);
 
+  useEffect(() => {
+    console.log('Creating worker...')
+    const worker = new MediaWorker()
+
+    worker.onerror = (error) => {
+      console.error('Worker error:', error)
+    }
+
+    worker.onmessageerror = (error) => {
+      console.error('Worker message error:', error)
+    }
+
+    worker.onmessage = (e) => {
+      console.log('Received message from worker:', e.data)
+    }
+
+    return () => worker.terminate() // Cleanup on unmount
+  }, [])
+
   return (
     <div className="flex flex-col gap-6 p-4 w-lvw h-lvh dark:bg-gray-950">
       <div className="relative w-full aspect-video">
@@ -269,9 +290,7 @@ function App() {
         </div>
       </div>
       <VideoTimeline
-        clips={clipsList}
         currentTime={currentTimeRef.current}
-        onAddClip={handleAddClip}
         onTimeUpdate={handleTimeUpdate}
         selectedClipId={selectedClipId}
         onClipSelect={setSelectedClipId}
