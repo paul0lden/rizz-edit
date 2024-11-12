@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { EventBusManager } from "./thread";
 
 type EventMap = Record<any, any>
@@ -46,17 +46,3 @@ export const useEventBus = (channelName: string = "rizz-edit") => {
     off,
   };
 };
-
-export const usePlayState = () => {
-  const [isPlaying, setPlaying] = useState(false);
-  const { on, off } = useEventBus();
-
-  useEffect(() => {
-    on('test', console.log)
-    return () => {
-      off('togglePlay', console.log)
-    }
-  }, [on, off])
-
-  return isPlaying
-}

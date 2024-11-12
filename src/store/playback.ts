@@ -1,21 +1,23 @@
-import { create } from "zustand";
-import { List, Map } from "immutable";
+import { useEffect, useState } from "react";
+import { useEventBus } from "@/utils/useEventbus";
 
-import type { VideoClip } from "../types";
+export const usePlaybackState = () => {
+  const [isPlaying, setPlaying] = useState(false);
+  const { on, off, emit } = useEventBus();
 
-interface ClipStore {
-  playbackPosition: number;
-  setPlaybackPosition: (position: number) => void;
+  useEffect(() => {
+    on('togglePlay', (state) => {
+      setPlaying(state)
+    })
+    return () => {
+      off('togglePlay', console.log)
+    }
+  }, [on, off])
+
+  return {
+    isPlaying,
+    togglePlay: () => {
+      emit('togglePlay', !isPlaying)
+    },
+  }
 }
-
-export const useClips = create<ClipStore>()(
-  (set, get) => {
-    const videoRefs = Map<number, HTMLVideoElement>();
-
-    return {
-      playbackPosition: 0, // in ms 
-      setPlaybackPosition: async (number) => {
-      },
-    };
-  },
-);

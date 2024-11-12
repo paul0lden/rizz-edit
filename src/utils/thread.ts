@@ -13,7 +13,6 @@ export class EventBus<T extends EventMap> {
     this.channel = new BroadcastChannel(channelName);
     this.listeners = new Map();
 
-    // Handle messages from other threads
     this.channel.onmessage = (event: MessageEvent<EventMessage<keyof T>>) => {
       this.handleEvent(event.data.type, event.data.payload);
     };
@@ -54,10 +53,8 @@ export class EventBus<T extends EventMap> {
   }
 
   emit<K extends keyof T>(eventType: K, payload: T[K]): void {
-    // Handle the event locally first
     this.handleEvent(eventType, payload);
 
-    // Then broadcast to other threads
     this.channel.postMessage({
       type: eventType,
       payload,

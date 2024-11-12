@@ -2,9 +2,10 @@ import { MP4PullDemuxer } from "./mp4_pull_demuxer";
 import "@/media/third_party/mp4boxjs/mp4box.all.min.js";
 import { AudioRenderer } from "@/media/lib/audio_renderer";
 import { VideoRenderer } from "@/media/lib/video_renderer";
-import { EventBus } from "@/thread";
+import { EventBus } from "@/utils/thread";
 
 console.info(`Worker started`);
+
 
 let playing = false;
 const audioRenderer = new AudioRenderer();
@@ -15,6 +16,7 @@ let lastMediaTimeCapturePoint = 0;
 const bus = new EventBus('rizz-edit')
 
 bus.on('test', console.log)
+bus.on('save', console.log)
 
 function updateMediaTime(mediaTimeSecs, capturedAtHighResTimestamp) {
   lastMediaTimeSecs = mediaTimeSecs;
