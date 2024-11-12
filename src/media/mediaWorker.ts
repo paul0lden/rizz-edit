@@ -1,26 +1,20 @@
-
-import { MP4PullDemuxer } from './mp4_pull_demuxer';
-import '@/media/third_party/mp4boxjs/mp4box.all.min.js';
-import { AudioRenderer } from '@/media/lib/audio_renderer';
-import { VideoRenderer } from '@/media/lib/video_renderer';
+import { MP4PullDemuxer } from "./mp4_pull_demuxer";
+import "@/media/third_party/mp4boxjs/mp4box.all.min.js";
+import { AudioRenderer } from "@/media/lib/audio_renderer";
+import { VideoRenderer } from "@/media/lib/video_renderer";
+import { EventBus } from "@/thread";
 
 console.info(`Worker started`);
 
-let moduleLoadedResolver = null;
-const modulesReady = new Promise(resolver => (moduleLoadedResolver = resolver));
-let playing = false
-let audioRenderer = null;
-let videoRenderer = null;
+let playing = false;
+const audioRenderer = new AudioRenderer();
+const videoRenderer = new VideoRenderer();
 let lastMediaTimeSecs = 0;
 let lastMediaTimeCapturePoint = 0;
 
-(async () => {
-  audioRenderer = new AudioRenderer();
-  videoRenderer = new VideoRenderer();
-  moduleLoadedResolver();
-  moduleLoadedResolver = null;
-  console.info('Worker modules imported');
-})();
+const bus = new EventBus('rizz-edit')
+
+bus.on('test', console.log)
 
 function updateMediaTime(mediaTimeSecs, capturedAtHighResTimestamp) {
   lastMediaTimeSecs = mediaTimeSecs;
@@ -32,17 +26,14 @@ function updateMediaTime(mediaTimeSecs, capturedAtHighResTimestamp) {
 // Estimate current media time using last given time + offset from now()
 function getMediaTimeMicroSeconds() {
   const msecsSinceCapture = performance.now() - lastMediaTimeCapturePoint;
-  return ((lastMediaTimeSecs * 1000) + msecsSinceCapture) * 1000;
+  return (lastMediaTimeSecs * 1000 + msecsSinceCapture) * 1000;
 }
 
-self.addEventListener('message', async function(e) {
-  await modulesReady;
-
+self.addEventListener("message", async function(e) {
   console.info(`Worker message: ${JSON.stringify(e.data)}`);
 
   switch (e.data.command) {
-    case 'initialize':
-
+    case "initialize":
       const audioDemuxer = new MP4PullDemuxer(e.data.audioFile);
       const audioReady = audioRenderer.initialize(audioDemuxer);
 
@@ -50,37 +41,39 @@ self.addEventListener('message', async function(e) {
       const videoReady = videoRenderer.initialize(videoDemuxer, e.data.canvas);
       await Promise.all([audioReady, videoReady]);
       postMessage({
-        command: 'initialize-done',
+        command: "initialize-done",
         sampleRate: audioRenderer.sampleRate,
         channelCount: audioRenderer.channelCount,
-        sharedArrayBuffer: audioRenderer.ringbuffer.buf
+        sharedArrayBuffer: audioRenderer.ringbuffer.buf,
       });
       break;
-    case 'play':
+    case "play":
       playing = true;
 
-      updateMediaTime(e.data.mediaTimeSecs,
-        e.data.mediaTimeCapturedAtHighResTimestamp);
+      updateMediaTime(
+        e.data.mediaTimeSecs,
+        e.data.mediaTimeCapturedAtHighResTimestamp
+      );
 
       audioRenderer.play();
 
       self.requestAnimationFrame(function renderVideo() {
-        if (!playing)
-          return;
+        if (!playing) return;
         videoRenderer.render(getMediaTimeMicroSeconds());
         self.requestAnimationFrame(renderVideo);
       });
       break;
-    case 'pause':
+    case "pause":
       playing = false;
       audioRenderer.pause();
       break;
-    case 'update-media-time':
-      updateMediaTime(e.data.mediaTimeSecs,
-        e.data.mediaTimeCapturedAtHighResTimestamp);
+    case "update-media-time":
+      updateMediaTime(
+        e.data.mediaTimeSecs,
+        e.data.mediaTimeCapturedAtHighResTimestamp
+      );
       break;
     default:
       console.error(`Worker bad message: ${e.data}`);
   }
-
 });

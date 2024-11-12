@@ -9,10 +9,10 @@ import { VideoTimeline } from "./components/Timeline";
 import VideoEditor from "./components/Editor";
 
 import MediaWorker from './media/mediaWorker?worker';
+import { useEventBus, usePlayState } from "./smth";
 
 function App() {
   // review those as well, extract
-  const [isPlaying, setIsPlaying] = useState(false);
   const [selectedClipId, setSelectedClipId] = useState<number | null>(null);
   const [clipsList, setClipsList] = useState<VideoClip[]>([]);
 
@@ -27,6 +27,9 @@ function App() {
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const needsRenderRef = useRef(false);
+  const isPlaying = usePlayState()
+  const { emit, on } = useEventBus()
+  on('test', (...args) => console.log('main: ', ...args))
 
   // should not be usedd
   useEffect(() => {
@@ -269,6 +272,8 @@ function App() {
     return () => worker.terminate() // Cleanup on unmount
   }, [])
 
+
+
   return (
     <div className="flex flex-col gap-6 p-4 w-lvw h-lvh dark:bg-gray-950">
       <div className="relative w-full aspect-video">
@@ -282,7 +287,11 @@ function App() {
         />
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
           <button
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={() => {
+              //setIsPlaying(!isPlaying)
+              emit('togglePlay', !isPlaying)
+              emit('test', {data: 2})
+            }}
             className="rounded-full flex justify-center items-center p-4 bg-blue-500 text-white hover:bg-blue-600"
           >
             {isPlaying ? <Pause /> : <Play />}

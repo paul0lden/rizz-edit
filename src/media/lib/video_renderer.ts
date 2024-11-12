@@ -1,4 +1,4 @@
-import { getContext } from 'twgl.js'
+import { getContext, isWebGL2 } from 'twgl.js'
 import { VIDEO_STREAM_TYPE } from "./pull_demuxer_base";
 
 const FRAME_BUFFER_TARGET_SIZE = 3;
@@ -14,6 +14,10 @@ export class VideoRenderer {
   private canvas: HTMLCanvasElement;
   private gl: WebGL2RenderingContext;
 
+  constructor() {
+
+  }
+
   async initialize(demuxer, canvas) {
     this.frameBuffer = [];
     this.fillInProgress = false;
@@ -25,7 +29,11 @@ export class VideoRenderer {
     this.canvas = canvas;
     this.canvas.width = config.displayWidth;
     this.canvas.height = config.displayHeight;
-    this.gl = getContext(canvas);
+    const gl = getContext(canvas);
+    if (!isWebGL2(gl)) {
+      throw new Error("Webgl2 not supported")
+    }
+    this.gl = gl as WebGL2RenderingContext
 
     this.decoder = new VideoDecoder({
       output: this.bufferFrame.bind(this),
