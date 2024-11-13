@@ -4,9 +4,6 @@ import { AudioRenderer } from "@/media/lib/audio_renderer";
 import { VideoRenderer } from "@/media/lib/video_renderer";
 import { EventBus } from "@/utils/thread";
 
-console.info(`Worker started`);
-
-
 let playing = false;
 const audioRenderer = new AudioRenderer();
 const videoRenderer = new VideoRenderer();
@@ -14,6 +11,7 @@ let lastMediaTimeSecs = 0;
 let lastMediaTimeCapturePoint = 0;
 
 const bus = new EventBus('rizz-edit')
+self.addEventListener('message', (e) => console.log(e.data))
 
 bus.on('test', console.log)
 bus.on('save', console.log)

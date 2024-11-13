@@ -8,9 +8,10 @@ import { VideoRenderer } from "./components/Editor/VideoRenderer";
 import { VideoTimeline } from "./components/Timeline";
 import VideoEditor from "./components/Editor";
 
-import MediaWorker from "./media/mediaWorker?worker";
 import { usePlaybackState } from "./store/playback";
 import useShortcutManager from "./utils/shortcutsManager";
+import { useMediaWorker } from "./media/useMediaWorker";
+import { canvas } from "framer-motion/client";
 
 function App() {
   // review those as well, extract
@@ -40,18 +41,18 @@ function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext("webgl2");
-    if (!gl) {
-      console.error("WebGL 2 not available");
-      return;
-    }
+    //const gl = canvas.getContext("webgl2");
+    //if (!gl) {
+    //  console.error("WebGL 2 not available");
+    //  return;
+    //}
 
     // Initialize all systems
-    glRef.current = gl;
-    videoRendererRef.current = new VideoRenderer(gl);
-    transformSystemRef.current = new TransformSystem(gl);
+    glRef.current = null;
+    //videoRendererRef.current = new VideoRenderer(gl);
+    //transformSystemRef.current = new TransformSystem(gl);
 
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    //gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     return () => {
       if (rafRef.current) {
@@ -251,26 +252,13 @@ function App() {
     needsRenderRef.current = true;
   }, []);
 
-  useEffect(() => {
-    console.log("Creating worker...");
-    const worker = new MediaWorker();
-
-    worker.onerror = (error) => {
-      console.error("Worker error:", error);
-    };
-
-    worker.onmessageerror = (error) => {
-      console.error("Worker message error:", error);
-    };
-
-    worker.onmessage = (e) => {
-      console.log("Received message from worker:", e.data);
-    };
-
-    return () => worker.terminate(); // Cleanup on unmount
-  }, []);
-
-  const { registerShortcut, unregisterShortcut } = useShortcutManager();
+  useMediaWorker({
+    onWorkerReady: () => {
+      const canvas = canvasRef.current?.transferControlToOffscreen();
+      return [{ canvas }, [canvas]];
+    },
+  });
+  useShortcutManager();
 
   return (
     <div className="flex flex-col gap-6 p-4 w-lvw h-lvh dark:bg-gray-950">

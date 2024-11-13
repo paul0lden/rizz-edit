@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Map } from "immutable";
 import { useEventBus } from "./useEventbus";
 
-// Define types for better type safety
 type ShortcutCallback = () => void;
 type ShortcutKeys = {
   key: string;
