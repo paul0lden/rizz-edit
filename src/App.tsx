@@ -253,10 +253,7 @@ function App() {
   }, []);
 
   useMediaWorker({
-    onWorkerReady: () => {
-      const canvas = canvasRef.current?.transferControlToOffscreen();
-      return [{ canvas }, [canvas]];
-    },
+    canvasRef: canvasRef,
   });
   useShortcutManager();
 

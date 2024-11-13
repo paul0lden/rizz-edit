@@ -1,11 +1,7 @@
-import { useEffect, useRef } from "react";
+import { RefObject, useEffect, useRef } from "react";
 import MediaWorker from "./mediaWorker?worker";
 
-export const useMediaWorker = ({
-  onWorkerReady,
-}: {
-  onWorkerReady: () => Parameters<Worker["postMessage"]> | null;
-}) => {
+export const useMediaWorker = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement> }) => {
   const worker = useRef<Worker>(null!);
 
   useEffect(() => {
@@ -20,16 +16,20 @@ export const useMediaWorker = ({
     worker.current.onmessageerror = (error) => {
       console.error("Worker message error:", error);
     };
-
-    const args = onWorkerReady()
-
-    if (args) {
-      worker.current.postMessage(...args);
+    const canvas = canvasRef.current?.transferControlToOffscreen();
+    if (canvas) {
+      worker.current.postMessage(
+        {
+          message: "canvasInit",
+          canvas,
+        },
+        [canvas]
+      );
     }
 
     return () => {
       worker.current.terminate();
       worker.current = null!;
     };
-  }, [onWorkerReady]);
+  }, [canvasRef]);
 };
