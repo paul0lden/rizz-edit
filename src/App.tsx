@@ -4,7 +4,6 @@ import { Play, Pause } from "lucide-react";
 
 import { VideoClip } from "./types";
 import { TransformSystem } from "./utils/transform";
-import { VideoRenderer } from "./components/Editor/VideoRenderer";
 import { VideoTimeline } from "./components/Timeline";
 import VideoEditor from "./components/Editor";
 
@@ -20,7 +19,6 @@ function App() {
   // review all of thsose
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext | null>(null);
-  const videoRendererRef = useRef<VideoRenderer | null>(null);
   const transformSystemRef = useRef<TransformSystem | null>(null);
   const videoRefs = useRef<{ [key: number]: HTMLVideoElement }>({});
   const clipsRef = useRef<VideoClip[]>([]);
@@ -61,37 +59,6 @@ function App() {
   }, []);
 
   // extract
-  const renderFrame = useCallback(() => {
-    const gl = glRef.current;
-    const videoRenderer = videoRendererRef.current;
-    //const selectionRenderer = selectionRendererRef.current;
-
-    if (
-      !gl ||
-      !videoRenderer
-      //|| !selectionRenderer
-    )
-      return;
-
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    // Render all clips
-    clipsRef.current.forEach((clip) => {
-      if (!clip.texture) return;
-
-      const video = videoRefs.current[clip.id];
-      if (!video) return;
-
-      if (isPlaying) {
-        twgl.setTextureFromElement(gl, clip.texture, video);
-      }
-
-      const selectedClip = clipsRef.current.find(
-        (clip) => clip.id === selectedClipId
-      );
-      videoRenderer.render(clip, selectedClip);
-    });
-  }, [isPlaying, selectedClipId]);
 
   // belongs to renderer
   useEffect(() => {
@@ -261,7 +228,6 @@ function App() {
       <div className="relative w-full aspect-video">
         <VideoEditor
           canvasRef={canvasRef}
-          videoRendererRef={videoRendererRef}
           clipsRef={clipsRef}
           setClipsList={setClipsList}
           needsRenderRef={needsRenderRef}
