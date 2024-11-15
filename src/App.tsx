@@ -11,7 +11,6 @@ import VideoEditor from "./components/Editor";
 import { usePlaybackState } from "./store/playback";
 import useShortcutManager from "./utils/shortcutsManager";
 import { useMediaWorker } from "./media/useMediaWorker";
-import { canvas } from "framer-motion/client";
 
 function App() {
   // review those as well, extract

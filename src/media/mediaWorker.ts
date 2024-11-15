@@ -1,20 +1,16 @@
-import { MP4PullDemuxer } from "./mp4_pull_demuxer";
-import "@/media/third_party/mp4boxjs/mp4box.all.min.js";
+import { MP4Demuxer } from "./mp4_pull_demuxer";
 import { AudioRenderer } from "@/media/lib/audio_renderer";
 import { VideoRenderer } from "@/media/lib/video_renderer";
 import { EventBus } from "@/utils/thread";
 
 let playing = false;
-const audioRenderer = new AudioRenderer();
+//const audioRenderer = new AudioRenderer();
 const videoRenderer = new VideoRenderer();
 let lastMediaTimeSecs = 0;
 let lastMediaTimeCapturePoint = 0;
 
 const bus = new EventBus('rizz-edit')
 self.addEventListener('message', (e) => console.log(e.data))
-
-bus.on('test', console.log)
-bus.on('save', console.log)
 
 function updateMediaTime(mediaTimeSecs, capturedAtHighResTimestamp) {
   lastMediaTimeSecs = mediaTimeSecs;
@@ -34,18 +30,8 @@ self.addEventListener("message", async function(e) {
 
   switch (e.data.command) {
     case "initialize":
-      const audioDemuxer = new MP4PullDemuxer(e.data.audioFile);
-      const audioReady = audioRenderer.initialize(audioDemuxer);
 
-      const videoDemuxer = new MP4PullDemuxer(e.data.videoFile);
-      const videoReady = videoRenderer.initialize(videoDemuxer, e.data.canvas);
-      await Promise.all([audioReady, videoReady]);
-      postMessage({
-        command: "initialize-done",
-        sampleRate: audioRenderer.sampleRate,
-        channelCount: audioRenderer.channelCount,
-        sharedArrayBuffer: audioRenderer.ringbuffer.buf,
-      });
+      console.log('post')
       break;
     case "play":
       playing = true;
@@ -77,3 +63,9 @@ self.addEventListener("message", async function(e) {
       console.error(`Worker bad message: ${e.data}`);
   }
 });
+
+bus.on('fileAdded', () => {
+  const demuxer = new MP4Demuxer(e.data.file);
+  demuxer.initialize()
+  const audioReady = audioRenderer.initialize(demuxer);
+})

@@ -30,6 +30,7 @@ export class VideoRenderer {
     this.canvas.width = config.displayWidth;
     this.canvas.height = config.displayHeight;
     const gl = getContext(canvas);
+    console.log('ctx', gl)
     if (!isWebGL2(gl)) {
       throw new Error("Webgl2 not supported")
     }

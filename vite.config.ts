@@ -4,7 +4,6 @@ import tailwindcss from "tailwindcss";
 import path from "path";
 import FullReload from 'vite-plugin-full-reload'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), FullReload(['src/**/*'])],
   css: {
@@ -38,5 +37,6 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    threads: true,
   },
 });

@@ -8,6 +8,7 @@ export const useMediaWorker = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasE
     if (worker.current) return;
     console.debug("Creating worker...");
     worker.current = new MediaWorker();
+    worker.current.onmessage = console.debug;
 
     worker.current.onerror = (error) => {
       console.error("Worker error:", error);
@@ -20,7 +21,7 @@ export const useMediaWorker = ({ canvasRef }: { canvasRef: RefObject<HTMLCanvasE
     if (canvas) {
       worker.current.postMessage(
         {
-          message: "canvasInit",
+          command: "initialize",
           canvas,
         },
         [canvas]
