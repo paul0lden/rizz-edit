@@ -1,8 +1,5 @@
 import React, { useRef } from "react";
-import { motion } from "framer-motion";
-import type { VideoClip } from "../../types";
-import { Plus, X, Video, Box, Code, Settings } from "lucide-react";
-import { useClips } from "../../store/clips";
+import { useClips } from "@/store/clips";
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -50,7 +47,11 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
               accept="video/*"
               className="hidden"
               onChange={(e) =>
-                e.target.files?.[0] && store.addClip(e.target.files[0])
+                e.target.files?.[0] &&
+                store.addClip({
+                  files: [...e.target.files],
+                  id: crypto.randomUUID(),
+                })
               }
             />
           </label>
@@ -68,9 +69,8 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
         {store.clips.map((clip) => (
           <div
             key={clip.id}
-            className={`absolute h-full rounded transition-colors ${
-              selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
-            }`}
+            className={`absolute h-full rounded transition-colors ${selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
+              }`}
             style={{
               left: `${(clip.startTime / duration) * 100}%`,
               width: `${(clip.duration / duration) * 100}%`,

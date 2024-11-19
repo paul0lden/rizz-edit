@@ -1,5 +1,6 @@
 import { getContext, isWebGL2 } from 'twgl.js'
 import { VIDEO_STREAM_TYPE } from "./pull_demuxer_base";
+import { MP4Demuxer } from '../mp4_pull_demuxer';
 
 const FRAME_BUFFER_TARGET_SIZE = 3;
 const ENABLE_DEBUG_LOGGING = false;
@@ -13,22 +14,23 @@ function debugLog(msg) {
 export class VideoRenderer {
   private canvas: HTMLCanvasElement;
   private gl: WebGL2RenderingContext;
+  private demuxer: MP4Demuxer;
+  private frameBuffer: Array<any>;
+  private fillInProgress: boolean;
 
-  constructor() {
+  constructor(demuxer: MP4Demuxer) {
+    this.demuxer = demuxer
 
-  }
-
-  async initialize(demuxer, canvas) {
     this.frameBuffer = [];
     this.fillInProgress = false;
+  }
 
-    this.demuxer = demuxer;
-    await this.demuxer.initialize(VIDEO_STREAM_TYPE);
-    const config = this.demuxer.getDecoderConfig();
+  async initialize() {
+    this.demuxer.initialize();
+    const config = await this.demuxer.getDecoderConfigs();
 
-    this.canvas = canvas;
-    this.canvas.width = config.displayWidth;
-    this.canvas.height = config.displayHeight;
+    this.canvas.width = config.video.displayWidth;
+    this.canvas.height = config.video.displayHeight;
     const gl = getContext(canvas);
     console.log('ctx', gl)
     if (!isWebGL2(gl)) {

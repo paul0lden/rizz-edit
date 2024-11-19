@@ -3,65 +3,10 @@ import { mat4 } from 'gl-matrix';
 import type { VideoClip } from '../../types';
 import { Camera } from './Camera';
 
-const videoVertexShader = `#version 300 es
-in vec4 a_position;
-in vec2 a_texcoord;
-
-uniform mat4 u_projection;
-uniform mat4 u_view;
-uniform mat4 u_model;
-
-out vec2 v_texcoord;
-
-void main() {
-    gl_Position = u_projection * u_view * u_model * a_position;
-    v_texcoord = a_texcoord;
-}`;
-
-const videoFragmentShader = `#version 300 es
-precision highp float;
-
-in vec2 v_texcoord;
-out vec4 outColor;
-
-uniform sampler2D u_texture;
-uniform float u_brightness;
-uniform float u_contrast;
-uniform float u_saturation;
-
-void main() {
-    vec4 color = texture(u_texture, v_texcoord);
-    
-    // Apply effects
-    color.rgb += u_brightness;
-    color.rgb = (color.rgb - 0.5) * u_contrast + 0.5;
-    float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    color.rgb = mix(vec3(luminance), color.rgb, u_saturation);
-    
-    outColor = color;
-}`;
-
-const selectionVertexShader = `#version 300 es
-in vec4 a_position;
-
-uniform mat4 u_projection;
-uniform mat4 u_view;
-uniform mat4 u_model;
-
-void main() {
-    gl_Position = u_projection * u_view * u_model * a_position;
-}`;
-
-const selectionFragmentShader = `#version 300 es
-precision highp float;
-
-out vec4 outColor;
-
-uniform vec4 u_color;
-
-void main() {
-    outColor = u_color;
-}`;
+import videoVertexShader from './shaders/video.vertex.glsl?raw';
+import videoFragmentShader from './shaders/video.fragment.glsl?raw';
+import selectionVertexShader from './shaders/selection.vertex.glsl?raw';
+import selectionFragmentShader from './shaders/selection.fragment.glsl?raw';
 
 export class VideoRenderer {
   private gl: WebGL2RenderingContext;
@@ -76,6 +21,8 @@ export class VideoRenderer {
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
+
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     // Create program using twgl
     this.programInfo = twgl.createProgramInfo(gl, [videoVertexShader, videoFragmentShader]);
@@ -236,5 +183,27 @@ export class VideoRenderer {
 
       gl.disable(gl.BLEND);
     }
+  }
+
+  renderFrame(clips = [], selectedClipId) {
+
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+    clips.forEach((clip) => {
+      if (!clip.texture) return;
+
+      // todo get texture somehow
+      //const video = videoRefs.current[clip.id];
+      //if (!video) return;
+
+
+      // todo adjust to set it from buffer instead of element
+      twgl.setTextureFromElement(this.gl, clip.texture, video);
+
+      const selectedClip = clips.find(
+        (clip) => clip.id === selectedClipId
+      );
+      this.render(clip, selectedClip);
+    });
   }
 }
