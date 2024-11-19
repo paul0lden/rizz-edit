@@ -11,7 +11,7 @@ export interface Transform {
 }
 
 export interface BaseClip {
-  id: number;
+  id: string;
   startTime: number;
   duration: number;
   transform: Transform;

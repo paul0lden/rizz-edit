@@ -1,24 +1,80 @@
-type EventMap = Record<string, any>;
-type EventCallback<T> = (payload: T) => void;
+export type EventMap = {
+  addClip: { files: File[]; id: string };
+  removeClip: { id: string };
+};
+
+type RequestMap = Record<string, { request: any; response: any }>;
+export type EventCallback<T> = (payload: T) => void;
+type RequestCallback<TReq, TRes> = (payload: TReq) => Promise<TRes>;
+
+export type BusEventCallback<TEventName extends keyof EventMap> = EventCallback<
+  EventMap[TEventName]
+>;
+
 interface EventMessage<K extends keyof EventMap> {
   type: K;
   payload: EventMap[K];
 }
 
-export class EventBus<T extends EventMap> {
+interface RequestMessage<K extends keyof RequestMap> {
+  type: K;
+  payload: RequestMap[K]["request"];
+  requestId: string;
+  isRequest: true;
+}
+
+interface ResponseMessage<K extends keyof RequestMap> {
+  type: K;
+  payload: RequestMap[K]["response"];
+  requestId: string;
+  isResponse: true;
+}
+
+type BusMessage<E extends EventMap, R extends RequestMap> =
+  | EventMessage<keyof E>
+  | RequestMessage<keyof R>
+  | ResponseMessage<keyof R>;
+
+export class EventBus<E extends EventMap, R extends RequestMap> {
   private channel: BroadcastChannel;
-  private listeners: Map<keyof T, Set<EventCallback<any>>>;
+  private listeners: Map<keyof E, Set<EventCallback<any>>>;
+  private requestHandlers: Map<keyof R, RequestCallback<any, any>>;
+  private pendingRequests: Map<
+    string,
+    { resolve: (value: any) => void; reject: (reason: any) => void }
+  >;
 
   constructor(channelName: string = "app-events") {
     this.channel = new BroadcastChannel(channelName);
     this.listeners = new Map();
+    this.requestHandlers = new Map();
+    this.pendingRequests = new Map();
 
-    this.channel.onmessage = (event: MessageEvent<EventMessage<keyof T>>) => {
-      this.handleEvent(event.data.type, event.data.payload);
+    this.channel.onmessage = (event: MessageEvent<BusMessage<E, R>>) => {
+      const message = event.data;
+      if (this.isRequestMessage(message)) {
+        this.handleRequest(message);
+      } else if (this.isResponseMessage(message)) {
+        this.handleResponse(message);
+      } else {
+        this.handleEvent(message.type, message.payload);
+      }
     };
   }
 
-  private handleEvent<K extends keyof T>(type: K, payload: T[K]): void {
+  private isRequestMessage(
+    message: BusMessage<E, R>
+  ): message is RequestMessage<keyof R> {
+    return "isRequest" in message;
+  }
+
+  private isResponseMessage(
+    message: BusMessage<E, R>
+  ): message is ResponseMessage<keyof R> {
+    return "isResponse" in message;
+  }
+
+  private handleEvent<K extends keyof E>(type: K, payload: E[K]): void {
     if (this.listeners.has(type)) {
       this.listeners.get(type)?.forEach((callback) => {
         try {
@@ -30,9 +86,35 @@ export class EventBus<T extends EventMap> {
     }
   }
 
-  on<K extends keyof T>(
+  private async handleRequest(message: RequestMessage<keyof R>): Promise<void> {
+    const handler = this.requestHandlers.get(message.type);
+    if (!handler) return;
+
+    try {
+      const response = await handler(message.payload);
+      this.channel.postMessage({
+        type: message.type,
+        payload: response,
+        requestId: message.requestId,
+        isResponse: true,
+      });
+    } catch (error) {
+      console.error(`Error handling request ${String(message.type)}:`, error);
+      // You might want to send an error response here
+    }
+  }
+
+  private handleResponse(message: ResponseMessage<keyof R>): void {
+    const pending = this.pendingRequests.get(message.requestId);
+    if (pending) {
+      pending.resolve(message.payload);
+      this.pendingRequests.delete(message.requestId);
+    }
+  }
+
+  on<K extends keyof E>(
     eventType: K,
-    callback: EventCallback<T[K]>
+    callback: EventCallback<E[K]>
   ): () => void {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Set());
@@ -43,7 +125,7 @@ export class EventBus<T extends EventMap> {
     };
   }
 
-  off<K extends keyof T>(eventType: K, callback: EventCallback<T[K]>): void {
+  off<K extends keyof E>(eventType: K, callback: EventCallback<E[K]>): void {
     if (this.listeners.has(eventType)) {
       this.listeners.get(eventType)?.delete(callback);
       if (this.listeners.get(eventType)?.size === 0) {
@@ -52,17 +134,56 @@ export class EventBus<T extends EventMap> {
     }
   }
 
-  emit<K extends keyof T>(eventType: K, payload: T[K]): void {
+  emit<K extends keyof E>(eventType: K, payload: E[K]): void {
     this.handleEvent(eventType, payload);
-
     this.channel.postMessage({
       type: eventType,
       payload,
     });
   }
 
+  onRequest<K extends keyof R>(
+    type: K,
+    handler: RequestCallback<R[K]["request"], R[K]["response"]>
+  ): () => void {
+    this.requestHandlers.set(type, handler);
+    return () => {
+      this.requestHandlers.delete(type);
+    };
+  }
+
+  request<K extends keyof R>(
+    type: K,
+    payload: R[K]["request"]
+  ): Promise<R[K]["response"]> {
+    const requestId = crypto.randomUUID();
+
+    const promise = new Promise<R[K]["response"]>((resolve, reject) => {
+      this.pendingRequests.set(requestId, { resolve, reject });
+
+      // Add timeout handling
+      setTimeout(() => {
+        if (this.pendingRequests.has(requestId)) {
+          this.pendingRequests.delete(requestId);
+          reject(new Error(`Request ${String(type)} timed out`));
+        }
+      }, 5000); // 5 second timeout
+    });
+
+    this.channel.postMessage({
+      type,
+      payload,
+      requestId,
+      isRequest: true,
+    });
+
+    return promise;
+  }
+
   destroy(): void {
     this.listeners.clear();
+    this.requestHandlers.clear();
+    this.pendingRequests.clear();
     this.channel.close();
   }
 }
@@ -71,24 +192,24 @@ export class EventBusManager {
   private static instances = new Map<
     string,
     {
-      bus: EventBus<any>;
+      bus: EventBus<any, any>;
       refCount: number;
       __type?: any;
     }
   >();
 
-  static getInstance<T extends Record<string, any>>(
+  static getInstance<E extends EventMap, R extends RequestMap>(
     channelName: string,
-    _typeValidator?: T
-  ): EventBus<T> {
+    _typeValidator?: E
+  ): EventBus<E, R> {
     const existing = this.instances.get(channelName);
 
     if (existing) {
       existing.refCount++;
-      return existing.bus as EventBus<T>;
+      return existing.bus as EventBus<E, R>;
     }
 
-    const newBus = new EventBus<T>(channelName);
+    const newBus = new EventBus<E, R>(channelName);
     this.instances.set(channelName, {
       bus: newBus,
       refCount: 1,

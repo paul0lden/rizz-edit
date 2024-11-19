@@ -1,7 +1,10 @@
 import { MP4Demuxer } from "./mp4_pull_demuxer";
 import { AudioRenderer } from "@/media/lib/audio_renderer";
 import { VideoRenderer } from "@/media/lib/video_renderer";
-import { EventBus } from "@/utils/thread";
+import { BusEventCallback, EventBusManager, EventMap } from "@/utils/thread";
+import { initCanvas } from "./render/glInit";
+import { VideoClip } from "@/types";
+import { storeClips } from "@/store/clipsStore";
 
 let playing = false;
 //const audioRenderer = new AudioRenderer();
@@ -9,8 +12,8 @@ const videoRenderer = new VideoRenderer();
 let lastMediaTimeSecs = 0;
 let lastMediaTimeCapturePoint = 0;
 
-const bus = new EventBus('rizz-edit')
-self.addEventListener('message', (e) => console.log(e.data))
+const bus = EventBusManager.getInstance("rizz-edit");
+self.addEventListener("message", (e) => console.log(e.data));
 
 function updateMediaTime(mediaTimeSecs, capturedAtHighResTimestamp) {
   lastMediaTimeSecs = mediaTimeSecs;
@@ -30,8 +33,9 @@ self.addEventListener("message", async function(e) {
 
   switch (e.data.command) {
     case "initialize":
+      storeClips();
+      initCanvas(e.data.canvas);
 
-      console.log('post')
       break;
     case "play":
       playing = true;
@@ -64,8 +68,8 @@ self.addEventListener("message", async function(e) {
   }
 });
 
-bus.on('fileAdded', () => {
+bus.on("fileAdded", () => {
   const demuxer = new MP4Demuxer(e.data.file);
-  demuxer.initialize()
+  demuxer.initialize();
   const audioReady = audioRenderer.initialize(demuxer);
-})
+});

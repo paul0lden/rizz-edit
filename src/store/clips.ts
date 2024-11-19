@@ -1,66 +1,50 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { List, Map } from "immutable";
+import { List } from "immutable";
 
-import type { VideoClip } from "../types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { VideoClip } from "@/types";
+import { useCallback, useEffect, useState } from "react";
 import { useEventBus } from "@/utils/useEventbus";
+import { EventMap } from "@/utils/thread";
 
 interface ClipStore {
-  clips: List<VideoClip>;
-  addClip: (file: File) => void;
+  clips: List<Partial<VideoClip>>;
+  addClip: EventMap['addClip'];
 }
 
-export const useClips = () => {
-  const [clips, setClips] = useState(List([]));
-  const { on, off, emit } = useEventBus();
-  const videoRefs = useRef(Map<number, HTMLVideoElement>());
+export const useClips = (): ClipStore => {
+  const [clips, setClips] = useState(List<Partial<VideoClip>>([]));
+  const { on, off, emit, request } = useEventBus();
 
-  const handleAddClip = useCallback(async (file: File) => {
-    const videoElement = document.createElement("video");
-    videoElement.src = URL.createObjectURL(file);
-    videoElement.playsInline = true;
-    videoElement.muted = true;
-    videoElement.preload = "auto";
+  const handleAddClip = useCallback<ClipStore["addClip"]>(
+    async ({ files, id }) => {
+      setClips((prev) => {
+        return prev.push(
+          ...files.map((file) => ({
+            id,
+            fileName: file.name,
+            startTime: 0,
+            effects: {
+              brightness: 0,
+              contrast: 1,
+              saturation: 1,
+            },
+          }))
+        );
+      });
+    },
+    []
+  );
 
-    await new Promise<void>((resolve) => {
-      videoElement.onloadedmetadata = () => resolve();
-    });
+  useEffect(() => {
+    //console.log('clips', clips);
+    //setClips((prev) => prev.push(...clips))
+    setTimeout(() => {
+      const aboba = request('getClips', null)
+      aboba.then(console.log)
+    }, 1000)
 
-    await videoElement.play();
-    videoElement.pause();
-    videoElement.currentTime = 0;
 
-    const aspectRatio =
-      videoElement.videoWidth / videoElement.videoHeight;
-    const scale = 0.5 / Math.max(1, aspectRatio);
 
-    const last = clips.last();
-
-    const clip: VideoClip = {
-      id: Date.now(),
-      file,
-      fileName: file.name,
-      duration: videoElement.duration,
-      startTime: last ? last.startTime + last.duration : 0,
-      transform: {
-        translation: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: [scale * aspectRatio, scale, 1],
-      },
-      effects: {
-        brightness: 0,
-        contrast: 1,
-        saturation: 1,
-      },
-    };
-
-    videoRefs.current = videoRefs.current.set(clip.id, videoElement);
-
-    setClips((prev) => {
-      return prev.push(clip);
-    });
-  }, [clips]);
+  }, [])
 
   useEffect(() => {
     on("addClip", handleAddClip);
@@ -69,7 +53,12 @@ export const useClips = () => {
     };
   }, [on, off, handleAddClip]);
 
+  const addClip: ClipStore['addClip'] = (params) => {
+    emit("addClip", params);
+  };
+
   return {
     clips,
+    addClip,
   };
 };
