@@ -1,9 +1,9 @@
 import { MP4Demuxer } from "./mp4_pull_demuxer";
 import { AudioRenderer } from "@/media/lib/audio_renderer";
-import { VideoRenderer } from "@/media/lib/video_renderer";
+import { ClipRenderer } from "@/media/lib/video_renderer";
 import { EventBusManager } from "@/utils/thread";
+import { VideoRenderer } from './render/VideoRenderer'
 import { initGL } from "./render/glInit";
-import { VideoClip } from "@/types";
 import { storeClips } from "@/store/clipsStore";
 import { PlaybackManager } from "@/store/playback";
 
@@ -15,7 +15,6 @@ self.addEventListener("message", (e) => console.log(e.data));
 const { clips } = storeClips();
 
 let videoRenderer;
-const playbackManager = PlaybackManager.getInstance();
 
 self.addEventListener("message", async function(e) {
   console.info(`Worker message: ${JSON.stringify(e.data)}`);

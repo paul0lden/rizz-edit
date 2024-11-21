@@ -8,12 +8,14 @@ import videoFragmentShader from './shaders/video.fragment.glsl?raw';
 import selectionVertexShader from './shaders/selection.vertex.glsl?raw';
 import selectionFragmentShader from './shaders/selection.fragment.glsl?raw';
 import { EventBus, EventBusManager } from '@/utils/thread';
+import { PlaybackManager } from '@/store/playback';
 
 export class VideoRenderer {
   private gl: WebGL2RenderingContext;
   private programInfo: twgl.ProgramInfo;
   private bufferInfo: twgl.BufferInfo;
   private bus: EventBus<any, any>;
+  private playbackManager: PlaybackManager;
   camera: Camera;
   //private clipData: 
 
@@ -21,7 +23,8 @@ export class VideoRenderer {
   private borderBufferInfo: twgl.BufferInfo;
   private handleBufferInfo: twgl.BufferInfo;
 
-  constructor(gl: WebGL2RenderingContext) {
+  constructor(gl: WebGL2RenderingContext, clips) {
+    this.playbackManager = PlaybackManager.getInstance();
     this.bus = EventBusManager.getInstance('rizz-edit');
 
     this.gl = gl;
