@@ -7,11 +7,13 @@ import videoVertexShader from './shaders/video.vertex.glsl?raw';
 import videoFragmentShader from './shaders/video.fragment.glsl?raw';
 import selectionVertexShader from './shaders/selection.vertex.glsl?raw';
 import selectionFragmentShader from './shaders/selection.fragment.glsl?raw';
+import { EventBus, EventBusManager } from '@/utils/thread';
 
 export class VideoRenderer {
   private gl: WebGL2RenderingContext;
   private programInfo: twgl.ProgramInfo;
   private bufferInfo: twgl.BufferInfo;
+  private bus: EventBus<any, any>;
   camera: Camera;
   //private clipData: 
 
@@ -20,8 +22,9 @@ export class VideoRenderer {
   private handleBufferInfo: twgl.BufferInfo;
 
   constructor(gl: WebGL2RenderingContext) {
-    this.gl = gl;
+    this.bus = EventBusManager.getInstance('rizz-edit');
 
+    this.gl = gl;
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     // Create program using twgl

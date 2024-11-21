@@ -1,5 +1,8 @@
+import { ClipMeta } from "@/types";
+
 export type EventMap = {
-  addClip: { files: File[]; id: string };
+  addFiles: { files: File[] };
+  addClips: ClipMeta[];
   removeClip: { id: string };
 };
 
@@ -16,11 +19,19 @@ interface EventMessage<K extends keyof EventMap> {
   payload: EventMap[K];
 }
 
+interface RequestOptions {
+  echo?: {
+    repeat?: number;
+    delay?: number;
+  };
+}
+
 interface RequestMessage<K extends keyof RequestMap> {
   type: K;
   payload: RequestMap[K]["request"];
   requestId: string;
   isRequest: true;
+  options?: RequestOptions;
 }
 
 interface ResponseMessage<K extends keyof RequestMap> {
@@ -41,7 +52,11 @@ export class EventBus<E extends EventMap, R extends RequestMap> {
   private requestHandlers: Map<keyof R, RequestCallback<any, any>>;
   private pendingRequests: Map<
     string,
-    { resolve: (value: any) => void; reject: (reason: any) => void }
+    {
+      resolve: (value: any) => void;
+      reject: (reason: any) => void;
+      echoTimeouts?: number[];
+    }
   >;
 
   constructor(channelName: string = "app-events") {
@@ -100,13 +115,15 @@ export class EventBus<E extends EventMap, R extends RequestMap> {
       });
     } catch (error) {
       console.error(`Error handling request ${String(message.type)}:`, error);
-      // You might want to send an error response here
     }
   }
 
   private handleResponse(message: ResponseMessage<keyof R>): void {
     const pending = this.pendingRequests.get(message.requestId);
     if (pending) {
+      if (pending.echoTimeouts) {
+        pending.echoTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+      }
       pending.resolve(message.payload);
       this.pendingRequests.delete(message.requestId);
     }
@@ -154,20 +171,39 @@ export class EventBus<E extends EventMap, R extends RequestMap> {
 
   request<K extends keyof R>(
     type: K,
-    payload: R[K]["request"]
+    payload: R[K]["request"],
+    options?: RequestOptions
   ): Promise<R[K]["response"]> {
     const requestId = crypto.randomUUID();
+    const echoRepeat = options?.echo?.repeat ?? 3;
+    const echoDelay = options?.echo?.delay ?? 100;
 
     const promise = new Promise<R[K]["response"]>((resolve, reject) => {
-      this.pendingRequests.set(requestId, { resolve, reject });
+      const echoTimeouts: number[] = [];
 
-      // Add timeout handling
+      for (let i = 1; i < echoRepeat; i++) {
+        const timeoutId = window.setTimeout(() => {
+          this.channel.postMessage({
+            type,
+            payload,
+            requestId,
+            isRequest: true,
+            options,
+          });
+        }, echoDelay * i) as unknown as number;
+
+        echoTimeouts.push(timeoutId);
+      }
+
+      this.pendingRequests.set(requestId, { resolve, reject, echoTimeouts });
+
       setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
+          echoTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
           this.pendingRequests.delete(requestId);
           reject(new Error(`Request ${String(type)} timed out`));
         }
-      }, 5000); // 5 second timeout
+      }, 5000);
     });
 
     this.channel.postMessage({
@@ -175,12 +211,19 @@ export class EventBus<E extends EventMap, R extends RequestMap> {
       payload,
       requestId,
       isRequest: true,
+      options,
     });
 
     return promise;
   }
 
   destroy(): void {
+    for (const { echoTimeouts } of this.pendingRequests.values()) {
+      if (echoTimeouts) {
+        echoTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      }
+    }
+
     this.listeners.clear();
     this.requestHandlers.clear();
     this.pendingRequests.clear();

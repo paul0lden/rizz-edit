@@ -1,46 +1,29 @@
-import { getContext, isWebGL2 } from 'twgl.js'
-import { VIDEO_STREAM_TYPE } from "./pull_demuxer_base";
-import { MP4Demuxer } from '../mp4_pull_demuxer';
+import { MP4Demuxer, VIDEO_STREAM_TYPE } from "../mp4_pull_demuxer";
 
 const FRAME_BUFFER_TARGET_SIZE = 3;
-const ENABLE_DEBUG_LOGGING = false;
 
-function debugLog(msg) {
-  if (!ENABLE_DEBUG_LOGGING)
-    return;
-  console.debug(msg);
-}
-
-export class VideoRenderer {
-  private canvas: HTMLCanvasElement;
-  private gl: WebGL2RenderingContext;
+export class ClipRenderer {
   private demuxer: MP4Demuxer;
   private frameBuffer: Array<any>;
   private fillInProgress: boolean;
+  private decoder: VideoDecoder;
+  private init_resolver: (() => Promise<void>) | null;
 
   constructor(demuxer: MP4Demuxer) {
-    this.demuxer = demuxer
+    this.demuxer = demuxer;
 
     this.frameBuffer = [];
     this.fillInProgress = false;
   }
 
+  // we asume demuxer is initialized when it comes here
   async initialize() {
-    this.demuxer.initialize();
-    const config = await this.demuxer.getDecoderConfigs();
-
-    this.canvas.width = config.video.displayWidth;
-    this.canvas.height = config.video.displayHeight;
-    const gl = getContext(canvas);
-    console.log('ctx', gl)
-    if (!isWebGL2(gl)) {
-      throw new Error("Webgl2 not supported")
-    }
-    this.gl = gl as WebGL2RenderingContext
+    const config =
+      (await this.demuxer.getDecoderConfigs()) as VideoDecoderConfig;
 
     this.decoder = new VideoDecoder({
       output: this.bufferFrame.bind(this),
-      error: e => console.error(e),
+      error: (e) => console.error(e),
     });
 
     const support = await VideoDecoder.isConfigSupported(config);
@@ -48,28 +31,28 @@ export class VideoRenderer {
     this.decoder.configure(config);
 
     this.init_resolver = null;
-    const promise = new Promise((resolver) => this.init_resolver = resolver);
+    const promise = new Promise(
+      (resolver) => (this.init_resolver = resolver as () => Promise<void>)
+    );
 
     this.fillFrameBuffer();
     return promise;
   }
 
-  render(timestamp) {
-    debugLog('render(%d)', timestamp);
+  render(timestamp: number) {
     const frame = this.chooseFrame(timestamp);
     this.fillFrameBuffer();
 
     if (frame == null) {
-      console.warn('VideoRenderer.render(): no frame ');
+      console.warn("VideoRenderer.render(): no frame ");
       return;
     }
 
-    this.paint(frame);
+    return frame;
   }
 
-  chooseFrame(timestamp) {
-    if (this.frameBuffer.length == 0)
-      return null;
+  chooseFrame(timestamp: number) {
+    if (this.frameBuffer.length == 0) return null;
 
     let minTimeDelta = Number.MAX_VALUE;
     let frameIndex = -1;
@@ -86,23 +69,17 @@ export class VideoRenderer {
 
     console.assert(frameIndex != -1);
 
-    if (frameIndex > 0)
-      debugLog('dropping %d stale frames', frameIndex);
-
     for (let i = 0; i < frameIndex; i++) {
       const staleFrame = this.frameBuffer.shift();
       staleFrame.close();
     }
 
     const chosenFrame = this.frameBuffer[0];
-    debugLog('frame time delta = %dms (%d vs %d)', minTimeDelta / 1000, timestamp, chosenFrame.timestamp)
     return chosenFrame;
   }
 
   async fillFrameBuffer() {
     if (this.frameBufferFull()) {
-      debugLog('frame buffer full');
-
       if (this.init_resolver) {
         this.init_resolver();
         this.init_resolver = null;
@@ -118,9 +95,16 @@ export class VideoRenderer {
     }
     this.fillInProgress = true;
 
-    while (this.frameBuffer.length < FRAME_BUFFER_TARGET_SIZE &&
-      this.decoder.decodeQueueSize < FRAME_BUFFER_TARGET_SIZE) {
-      const chunk = await this.demuxer.getNextChunk();
+    while (
+      this.frameBuffer.length < FRAME_BUFFER_TARGET_SIZE &&
+      this.decoder.decodeQueueSize < FRAME_BUFFER_TARGET_SIZE
+    ) {
+      const chunk = (await this.demuxer.getNextChunk(
+        VIDEO_STREAM_TYPE
+      )) as EncodedVideoChunk;
+      if (!chunk) {
+        throw new Error("NO VIDEO CHUNK");
+      }
       this.decoder.decode(chunk);
     }
 
@@ -135,11 +119,6 @@ export class VideoRenderer {
   }
 
   bufferFrame(frame) {
-    debugLog(`bufferFrame(${frame.timestamp})`);
     this.frameBuffer.push(frame);
-  }
-
-  paint(frame) {
-    this.canvasCtx.drawImage(frame, 0, 0, this.canvas.width, this.canvas.height);
   }
 }

@@ -1,10 +1,7 @@
 import { DB_FILE_STORE, DB_NAME } from "@/globals";
-import { VideoClip } from "@/types";
+import { Clip } from "@/types";
 
-interface StoredVideoClip extends Omit<VideoClip, "file" | "texture"> {
-  blob: Blob;
-  lastModified: number;
-}
+type PersistedClip = Omit<Clip, 'demuxer' | 'texture'>
 
 export class FileStorage {
   private dbName: string;
@@ -27,8 +24,8 @@ export class FileStorage {
         resolve(true);
       };
 
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
+      request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+        const db = (event.target as IDBOpenDBRequest)?.result;
         if (!db.objectStoreNames.contains(this.storeName)) {
           db.createObjectStore(this.storeName, {
             keyPath: "id",
@@ -39,10 +36,10 @@ export class FileStorage {
     });
   }
 
-  async saveVideoClip(clips: VideoClip[]) {
+  async saveVideoClip(clips: Clip[]) {
     if (!this.db) await this.init();
 
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       if (!this.db) {
         return reject();
       }
@@ -50,31 +47,17 @@ export class FileStorage {
       const store = transaction.objectStore(this.storeName);
 
       for (const clip of clips) {
-        const buffer = await clip?.file.arrayBuffer();
-
-        const storedClip: StoredVideoClip = {
-          id: clip?.id,
-          duration: clip?.duration,
-          transform: clip?.transform,
-          startTime: clip?.startTime,
-          type: clip?.type,
-          fileName: clip?.fileName,
-          width: clip?.width,
-          height: clip?.height,
-          effects: clip?.effects,
-          buffer: buffer,
-          lastModified: clip?.file?.lastModified,
-        };
-
-        const request = store.add(storedClip);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        delete clip.demuxer;
+        delete clip.texture;
+        store.add(clip);
       }
 
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = reject;
     });
   }
 
-  async getVideoClip(id: string): Promise<StoredVideoClip> {
+  async getVideoClip(id: string): Promise<PersistedClip> {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
@@ -90,7 +73,7 @@ export class FileStorage {
     });
   }
 
-  async getAllVideoClips() {
+  async getAllVideoClips(): Promise<PersistedClip[]> {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
@@ -101,7 +84,7 @@ export class FileStorage {
       const store = transaction.objectStore(this.storeName);
       const request = store.getAll();
 
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => resolve(request.result as unknown as PersistedClip[]);
       request.onerror = () => reject(request.error);
     });
   }

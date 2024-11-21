@@ -1,3 +1,4 @@
+import { VideoMeta } from "@/types";
 import MP4Box, {
   DataStream,
   MP4ArrayBuffer,
@@ -55,13 +56,13 @@ type DecoderConfigs = {
   };
 };
 
-const VIDEO_STREAM_TYPE = "video";
-const AUDIO_STREAM_TYPE = "audio";
+export const VIDEO_STREAM_TYPE = "video";
+export const AUDIO_STREAM_TYPE = "audio";
 
 type StreamType = typeof VIDEO_STREAM_TYPE | typeof AUDIO_STREAM_TYPE;
 
 export class MP4Demuxer {
-  private file: File;
+  private file: Blob;
   private source: MP4Source;
   private readySamples: {
     video: Array<MP4Sample>;
@@ -74,7 +75,7 @@ export class MP4Demuxer {
   private videoTrack: MP4VideoTrack | null;
   private audioTrack: MP4AudioTrack | null;
 
-  constructor(file: File) {
+  constructor(file: Blob) {
     this.file = file;
     this.source = new MP4Source(file);
     this.readySamples = {
@@ -148,7 +149,31 @@ export class MP4Demuxer {
   }
 
   async getFileInfo() {
-    return await this.source.getInfo()
+    return await this.source.getInfo();
+  }
+
+  async getVideoInfo(): Promise<VideoMeta> {
+    await this._tracksReady(); // Wait for tracks to be initialized
+
+    if (!this.videoTrack) {
+      throw new Error("No video track found in the file");
+    }
+
+    console.log(this.videoTrack.movie_timescale)
+
+    return {
+      width: this.videoTrack.track_width,
+      height: this.videoTrack.track_height,
+      duration:
+        this.videoTrack.movie_duration,
+      frameCount: this.videoTrack.nb_samples,
+      // Calculate frame rate from samples and duration
+      frameRate:
+        (this.videoTrack.nb_samples * this.videoTrack.movie_timescale) /
+        this.videoTrack.movie_duration,
+      codec: this.videoTrack.codec,
+      bitrate: this.videoTrack.bitrate,
+    };
   }
 
   private _getDescription(descriptionBox: Box): Uint8Array {
@@ -209,18 +234,21 @@ class MP4Source {
   private info_resolver: ((info: MP4Info) => void) | null;
   private _onSamples?: (track_id: number, samples: MP4Sample[]) => void;
 
-  constructor(file: File) {
+  constructor(file: Blob) {
     this.file = MP4Box.createFile();
     this.file.onError = console.error.bind(console);
     this.file.onReady = this.onReady.bind(this);
     this.file.onSamples = this.onSamples.bind(this);
 
-    debugLog('fetching file');
+    debugLog("fetching file");
     const reader = file.stream().getReader();
     let offset = 0;
     const mp4File = this.file;
 
-    function appendBuffers({ done, value }: ReadableStreamReadResult<Uint8Array>): Promise<void> | undefined {
+    function appendBuffers({
+      done,
+      value,
+    }: ReadableStreamReadResult<Uint8Array>): Promise<void> | undefined {
       if (done) {
         mp4File.flush();
         return;

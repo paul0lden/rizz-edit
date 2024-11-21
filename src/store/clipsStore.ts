@@ -1,77 +1,97 @@
 import { List, Map } from "immutable";
 import { FileStorage } from "./persist";
-import { VideoClip } from "@/types";
+import { Clip } from "@/types";
 import { MP4Demuxer } from "@/media/mp4_pull_demuxer";
 import { BusEventCallback, EventBusManager } from "@/utils/thread";
 
 const bus = EventBusManager.getInstance("rizz-edit");
 
+function arrayBufferToBlob(
+  arrayBuffer: ArrayBuffer,
+  mimeType = "application/octet-stream"
+) {
+  const blob = new Blob([arrayBuffer], { type: mimeType });
+  return blob
+}
+
 export const storeClips = () => {
-  let clips = List<VideoClip>([]);
+  let clips = List<Clip>([]);
   const storage = new FileStorage();
 
-  // Initialize by loading existing clips from storage
   const initialize = async () => {
     try {
       await storage.init();
       const storedClips = await storage.getAllVideoClips();
 
-      clips = List(storedClips.map(storedClip => {
-        const file = new File([storedClip.blob], storedClip.fileName, {
-          lastModified: storedClip.lastModified
-        });
-        const demuxer = new MP4Demuxer(file);
-        demuxer.initialize();
+      const clipsToAdd = await Promise.all(
+        storedClips.map(async (storedClip): Promise<Clip> => {
+          const demuxer = new MP4Demuxer(
+            arrayBufferToBlob(storedClip.buffer)
+          );
+          demuxer.initialize();
 
-        return {
-          id: storedClip.id,
-          demuxer,
-          file,
-          fileName: storedClip.fileName,
-          startTime: storedClip.startTime,
-          transform: storedClip.transform,
-          effects: storedClip.effects,
-        };
-      }));
+          return {
+            ...storedClip,
+            demuxer,
+          };
+        })
+      );
+
+      clips = clips.push(...clipsToAdd);
     } catch (error) {
-      console.error('Failed to initialize from storage:', error);
+      console.error("Failed to initialize from storage:", error);
     }
   };
 
-  const handleAddClip: BusEventCallback<"addClip"> = async ({ files, id }) => {
-    const newClips = files.map(async (file) => {
-      const demuxer = new MP4Demuxer(file);
+  const handleAddFiles: BusEventCallback<"addFiles"> = async ({ files }) => {
+    const newClips = await Promise.all(
+      files.map(async (file): Promise<Clip> => {
+        const buffer = await file.arrayBuffer();
+        const demuxer = new MP4Demuxer(file);
+        const info = await demuxer.getVideoInfo();
 
-      const info = await demuxer.getFileInfo()
-      console.log(info)
-
-      demuxer.initialize();
-      return {
-        id,
-        demuxer,
-        file,
-        fileName: file.name,
-        startTime: 0,
-        transform: {
-          translation: [0, 0, 0],
-          rotation: [0, 0, 0],
-          scale: [1, 1, 1],
-        },
-        effects: {
-          brightness: 0,
-          contrast: 1,
-          saturation: 1,
-        },
-      };
-    });
+        demuxer.initialize();
+        return {
+          ...info,
+          id: crypto.randomUUID(),
+          demuxer,
+          buffer,
+          name: file.name,
+          startTime: 0,
+          transform: {
+            x: 0,
+            y: 0,
+            width: info.width,
+            height: info.height,
+            rotation: 0,
+            scale: { x: 1, y: 1 },
+          },
+          effects: {
+            brightness: 0,
+            contrast: 1,
+            saturation: 1,
+          },
+        };
+      })
+    );
 
     clips = clips.push(...newClips);
 
-    console.log(newClips)
+    bus.emit(
+      "addClips",
+      newClips.map((el) => ({
+        effects: el.effects,
+        startTime: el.startTime,
+        id: el.id,
+        duration: el.duration,
+        name: el.name,
+      }))
+    );
+
     try {
       await storage.saveVideoClip(newClips);
     } catch (error) {
-      console.error('Failed to persist clips:', error);
+      console.error("Failed to persist clips:", error);
       clips = clips.splice(-newClips.length, 1);
     }
   };
@@ -85,7 +105,7 @@ export const storeClips = () => {
     try {
       await storage.deleteVideoClip(id);
     } catch (error) {
-      console.error('Failed to remove clip from storage:', error);
+      console.error("Failed to remove clip from storage:", error);
       const removedClip = clips.get(index);
       if (removedClip) {
         clips = clips.insert(index, removedClip);
@@ -95,12 +115,24 @@ export const storeClips = () => {
 
   initialize();
 
-  bus.on("addClip", handleAddClip);
+  bus.on("addFiles", handleAddFiles);
   bus.on("removeClip", handleRemoveClip);
-  bus.onRequest("getClips", async () => clips.toArray());
+  bus.onRequest("getClips", async () => {
+    console.log(clips.toArray());
+    return clips.toArray().map((el) => ({
+      effects: el.effects,
+      startTime: el.startTime,
+      id: el.id,
+      duration: el.duration,
+      name: el.name,
+    }));
+  });
 
-  return () => {
-    bus.off("addClip", handleAddClip);
-    bus.off("removeClip", handleRemoveClip);
+  return {
+    cleanup: () => {
+      bus.off("addFiles", handleAddFiles);
+      bus.off("removeClip", handleRemoveClip);
+    },
+    clips,
   };
 };

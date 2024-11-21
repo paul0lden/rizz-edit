@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { EventBus, EventBusManager } from '../utils/thread';
 import { useEventBus } from "@/utils/useEventbus";
 import { CHANNEL_NAME } from "@/globals";
 
-class PlaybackManager {
+export class PlaybackManager {
   private isPlaying: boolean = false;
   private startTime: number = 0;
   private currentTime: number = 0;
   private animationFrame: number | null = null;
-  private bus: EventBus<any>;
+  private bus: EventBus<any, any>;
   public static instance: PlaybackManager | null = null;
 
   private constructor() {
@@ -23,6 +23,7 @@ class PlaybackManager {
   }
 
   private update = (timestamp: number) => {
+    console.log('update')
     if (!this.isPlaying) return;
 
     if (this.startTime === 0) {
@@ -63,32 +64,34 @@ class PlaybackManager {
   }
 }
 
-export default PlaybackManager;
-
 export const usePlaybackState = () => {
   const [isPlaying, setPlaying] = useState(false);
+  const [] = useState(0)
   const { on, off, emit } = useEventBus();
 
-  const playbackRef = useRef<PlaybackManager>(PlaybackManager.getInstance())
+  const handlePlay = () => {
+    setPlaying(true);
+  }
+  const handlePause = () => {
+    setPlaying(true);
+  }
 
   useEffect(() => {
-    on('togglePlay', (state) => {
-      if (state) {
-        playbackRef.current.play();
-      } else {
-        playbackRef.current.pause();
-      }
-      setPlaying(state);
-    })
+    const offPlay = on('play', handlePlay)
+    const offPause = on('pause', handlePause)
     return () => {
-      off('togglePlay', console.log);
+      offPlay();
+      offPause();
     }
   }, [on, off])
 
   return {
     isPlaying,
-    togglePlay: () => {
-      emit('togglePlay', !isPlaying)
+    play: () => {
+      emit('play', null)
+    },
+    pause: () => {
+      emit('pause', null)
     },
   }
 }

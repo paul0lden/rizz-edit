@@ -1,64 +1,48 @@
 import { List } from "immutable";
 
-import type { VideoClip } from "@/types";
+import type { ClipMeta } from "@/types";
 import { useCallback, useEffect, useState } from "react";
 import { useEventBus } from "@/utils/useEventbus";
-import { EventMap } from "@/utils/thread";
+import { BusEventCallback } from "@/utils/thread";
 
 interface ClipStore {
-  clips: List<Partial<VideoClip>>;
-  addClip: EventMap['addClip'];
+  clips: List<ClipMeta>;
+  addFiles: BusEventCallback<"addFiles">;
 }
 
 export const useClips = (): ClipStore => {
-  const [clips, setClips] = useState(List<Partial<VideoClip>>([]));
+  const [clips, setClips] = useState(List<ClipMeta>([]));
   const { on, off, emit, request } = useEventBus();
 
-  const handleAddClip = useCallback<ClipStore["addClip"]>(
-    async ({ files, id }) => {
+  const handleAddClips = useCallback<BusEventCallback<'addClips'>>(
+    async (clips) => {
       setClips((prev) => {
         return prev.push(
-          ...files.map((file) => ({
-            id,
-            fileName: file.name,
-            startTime: 0,
-            effects: {
-              brightness: 0,
-              contrast: 1,
-              saturation: 1,
-            },
-          }))
-        );
+          ...clips
+        )
       });
     },
     []
   );
 
   useEffect(() => {
-    //console.log('clips', clips);
-    //setClips((prev) => prev.push(...clips))
-    setTimeout(() => {
-      const aboba = request('getClips', null)
-      aboba.then(console.log)
-    }, 1000)
-
-
-
+    const response = request('getClips', null)
+    response.then(handleAddClips)
   }, [])
 
   useEffect(() => {
-    on("addClip", handleAddClip);
+    on("addClips", handleAddClips);
     return () => {
-      off("addClip", handleAddClip);
+      off("addClips", handleAddClips);
     };
-  }, [on, off, handleAddClip]);
+  }, [on, off, handleAddClips]);
 
-  const addClip: ClipStore['addClip'] = (params) => {
-    emit("addClip", params);
+  const addFiles: ClipStore['addFiles'] = (params) => {
+    emit("addFiles", params);
   };
 
   return {
     clips,
-    addClip,
+    addFiles,
   };
 };

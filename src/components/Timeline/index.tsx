@@ -48,9 +48,8 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
               className="hidden"
               onChange={(e) =>
                 e.target.files?.[0] &&
-                store.addClip({
+                store.addFiles({
                   files: [...e.target.files],
-                  id: crypto.randomUUID(),
                 })
               }
             />
@@ -66,25 +65,26 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
         className="relative h-20 bg-gray-700 rounded cursor-pointer"
         onClick={handleTimelineClick}
       >
-        {store.clips.map((clip) => (
-          <div
-            key={clip.id}
-            className={`absolute h-full rounded transition-colors ${selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
-              }`}
-            style={{
-              left: `${(clip.startTime / duration) * 100}%`,
-              width: `${(clip.duration / duration) * 100}%`,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClipSelect(clip.id);
-            }}
-          >
-            <div className="p-2 text-white text-sm truncate">
-              {clip.fileName}
+        {store.clips.map((clip) => {
+          console.log(clip.duration)
+          return (
+            <div
+              key={clip.id}
+              className={`absolute h-full rounded transition-colors ${selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
+                }`}
+              style={{
+                left: `${(clip.startTime / duration) * 100}%`,
+                width: `${(clip.duration / duration) * 100}%`,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClipSelect(clip.id);
+              }}
+            >
+              <div className="p-2 text-white text-sm truncate">{clip.name}</div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Playhead */}
         <div
