@@ -47,10 +47,18 @@ export class FileStorage {
       const store = transaction.objectStore(this.storeName);
 
       for (const clip of clips) {
-        delete clip.demuxer;
-        delete clip.texture;
-        delete clip.processor;
-        store.add(clip);
+        store.add({
+          buffer: clip.buffer,
+          width: clip.width,
+          height: clip.height,
+          transform: { ...clip.transform },
+          framerate: clip.framerate,
+          id: clip.id,
+          startTime: clip.startTime,
+          duration: clip.duration,
+          name: clip.name,
+          effects: { ...clip.effects },
+        });
       }
 
       transaction.oncomplete = () => resolve(true);

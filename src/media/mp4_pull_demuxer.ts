@@ -112,14 +112,14 @@ export class MP4Demuxer {
       };
     }
 
-    if (this.audioTrack) {
-      configs.audio = {
-        codec: this.audioTrack.codec,
-        sampleRate: this.audioTrack.audio.sample_rate,
-        numberOfChannels: this.audioTrack.audio.channel_count,
-        description: this.source.getAudioSpecificConfig(),
-      };
-    }
+    //if (this.audioTrack) {
+    //  configs.audio = {
+    //    codec: this.audioTrack.codec,
+    //    sampleRate: this.audioTrack.audio.sample_rate,
+    //    numberOfChannels: this.audioTrack.audio.channel_count,
+    //    description: this.source.getAudioSpecificConfig(),
+    //  };
+    //}
 
     return configs;
   }
@@ -153,8 +153,6 @@ export class MP4Demuxer {
     if (!this.videoTrack) {
       throw new Error("No video track found in the file");
     }
-
-    console.log(this.videoTrack.movie_timescale)
 
     return {
       width: this.videoTrack.track_width,

@@ -7,6 +7,7 @@ export class PlaybackManager {
   private isPlaying: boolean = false;
   private startTime: number = 0;
   private currentTime: number = 0;
+  private pausedTime: number = 0;
   private animationFrame: number | null = null;
   private bus: EventBus<any, any>;
   public static instance: PlaybackManager | null = null;
@@ -23,14 +24,14 @@ export class PlaybackManager {
   }
 
   private update = (timestamp: number) => {
-    console.log("update");
     if (!this.isPlaying) return;
 
     if (this.startTime === 0) {
       this.startTime = timestamp;
     }
 
-    this.currentTime = timestamp - this.startTime;
+    // Calculate elapsed time since last play, accounting for accumulated paused time
+    this.currentTime = timestamp - this.startTime - this.pausedTime;
 
     this.bus.emit("playbackTime", {
       time: this.currentTime,
@@ -41,12 +42,24 @@ export class PlaybackManager {
 
   play() {
     if (this.isPlaying) return;
+
     this.isPlaying = true;
+
+    // When resuming, we need to account for the time spent paused
+    if (this.currentTime > 0) {
+      const now = performance.now();
+      this.pausedTime +=
+        now - (this.startTime + this.currentTime + this.pausedTime);
+    }
+
     this.animationFrame = requestAnimationFrame(this.update);
   }
 
   pause() {
+    if (!this.isPlaying) return;
+
     this.isPlaying = false;
+
     if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
@@ -57,6 +70,7 @@ export class PlaybackManager {
     this.pause();
     this.startTime = 0;
     this.currentTime = 0;
+    this.pausedTime = 0;
   }
 
   getCurrentTime(): number {
@@ -69,11 +83,9 @@ export const usePlaybackState = () => {
   const { on, off, emit } = useEventBus();
 
   const handlePlay = () => {
-    console.log("play");
     setPlaying(true);
   };
   const handlePause = () => {
-    console.log("pause");
     setPlaying(false);
   };
 
@@ -87,7 +99,6 @@ export const usePlaybackState = () => {
   }, [on, off]);
 
   const togglePlay = useCallback(() => {
-    console.log(isPlaying);
     if (isPlaying) emit("pause", null);
     else emit("play", null);
   }, [isPlaying, emit]);

@@ -136,8 +136,10 @@ export class VideoRenderer {
 
     this.bus.on("playbackTime", () => {
       this.renderFrame(getClips().toArray());
-      console.log(123)
     });
+    this.bus.on("addClips", () => {
+      this.renderFrame(getClips().toArray());
+    })
     setTimeout(() => {
       this.renderFrame(getClips().toArray());
     }, 100);
@@ -230,7 +232,6 @@ export class VideoRenderer {
     const time = this.playbackManager.getCurrentTime()
 
     clips.forEach((clip) => {
-      console.log("frame",);
       const texture = twgl.createTexture(this.gl, {
         src: clip.processor.getFrame(time * 1000),
         width: 1,

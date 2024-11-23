@@ -57,8 +57,6 @@ export const storeClips = () => {
         await demuxer.initialize();
         const processor = new ClipRenderer(demuxer)
         await processor.initialize()
-        console.log(123)
-
 
         return {
           ...info,
@@ -74,7 +72,7 @@ export const storeClips = () => {
             width: info.width,
             height: info.height,
             rotation: 0,
-            scale: { x: 1, y: 1 },
+            scale: { x: info.width / 1000, y: info.height / 1000 },
           },
           effects: {
             brightness: 0,
@@ -99,7 +97,7 @@ export const storeClips = () => {
     );
 
     try {
-      await storage.saveVideoClip(newClips);
+      storage.saveVideoClip(newClips);
     } catch (error) {
       console.error("Failed to persist clips:", error);
       clips = clips.splice(-newClips.length, 1);
@@ -128,7 +126,6 @@ export const storeClips = () => {
   bus.on("addFiles", handleAddFiles);
   bus.on("removeClip", handleRemoveClip);
   bus.onRequest("getClips", async () => {
-    console.log(clips.toArray());
     return clips.toArray().map((el) => ({
       effects: el.effects,
       startTime: el.startTime,
