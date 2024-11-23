@@ -18,17 +18,17 @@ export class ClipRenderer {
 
   // we asume demuxer is initialized when it comes here
   async initialize() {
-    const config =
-      (await this.demuxer.getDecoderConfigs()) as VideoDecoderConfig;
+    const config = await this.demuxer.getDecoderConfigs();
+    if (!config.video) return;
 
     this.decoder = new VideoDecoder({
       output: this.bufferFrame.bind(this),
       error: (e) => console.error(e),
     });
 
-    const support = await VideoDecoder.isConfigSupported(config);
+    const support = await VideoDecoder.isConfigSupported(config.video);
     console.assert(support.supported);
-    this.decoder.configure(config);
+    this.decoder.configure(config.video);
 
     this.init_resolver = null;
     const promise = new Promise(
@@ -39,7 +39,7 @@ export class ClipRenderer {
     return promise;
   }
 
-  render(timestamp: number) {
+  getFrame(timestamp: number) {
     const frame = this.chooseFrame(timestamp);
     this.fillFrameBuffer();
 

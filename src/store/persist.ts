@@ -49,6 +49,7 @@ export class FileStorage {
       for (const clip of clips) {
         delete clip.demuxer;
         delete clip.texture;
+        delete clip.processor;
         store.add(clip);
       }
 

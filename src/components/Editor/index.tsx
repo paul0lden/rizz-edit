@@ -27,10 +27,10 @@ const VideoEditor: React.FC<any> = ({
         }`}
       width={1920}
       height={1080}
-      onPointerDown={console.log}
-      onPointerMove={console.log}
-      onPointerUp={console.log}
-      onPointerLeave={console.log}
+      //onPointerDown={console.log}
+      //onPointerMove={console.log}
+      //onPointerUp={console.log}
+      //onPointerLeave={console.log}
       onContextMenu={(e) => e.preventDefault()}
     />
   );

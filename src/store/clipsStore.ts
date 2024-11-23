@@ -1,8 +1,9 @@
-import { List, Map } from "immutable";
+import { List } from "immutable";
 import { FileStorage } from "./persist";
 import { Clip } from "@/types";
 import { MP4Demuxer } from "@/media/mp4_pull_demuxer";
 import { BusEventCallback, EventBusManager } from "@/utils/thread";
+import { ClipRenderer } from "@/media/lib/video_renderer";
 
 const bus = EventBusManager.getInstance("rizz-edit");
 
@@ -28,11 +29,14 @@ export const storeClips = () => {
           const demuxer = new MP4Demuxer(
             arrayBufferToBlob(storedClip.buffer)
           );
-          demuxer.initialize();
+          await demuxer.initialize();
+          const processor = new ClipRenderer(demuxer)
+          await processor.initialize()
 
           return {
             ...storedClip,
             demuxer,
+            processor,
           };
         })
       );
@@ -50,11 +54,17 @@ export const storeClips = () => {
         const demuxer = new MP4Demuxer(file);
         const info = await demuxer.getVideoInfo();
 
-        demuxer.initialize();
+        await demuxer.initialize();
+        const processor = new ClipRenderer(demuxer)
+        await processor.initialize()
+        console.log(123)
+
+
         return {
           ...info,
           id: crypto.randomUUID(),
           demuxer,
+          processor,
           buffer,
           name: file.name,
           startTime: 0,
@@ -133,6 +143,6 @@ export const storeClips = () => {
       bus.off("addFiles", handleAddFiles);
       bus.off("removeClip", handleRemoveClip);
     },
-    clips,
+    getClips: () => clips,
   };
 };

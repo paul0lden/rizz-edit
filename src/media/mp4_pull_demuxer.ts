@@ -42,12 +42,7 @@ declare class EncodedAudioChunk {
 }
 
 type DecoderConfigs = {
-  video?: {
-    codec: string;
-    displayWidth: number;
-    displayHeight: number;
-    description: Uint8Array;
-  };
+  video?: VideoDecoderConfig;
   audio?: {
     codec: string;
     sampleRate: number;
@@ -109,8 +104,8 @@ export class MP4Demuxer {
         codec: this.videoTrack.codec.startsWith("vp08")
           ? "vp8"
           : this.videoTrack.codec,
-        displayWidth: this.videoTrack.track_width,
-        displayHeight: this.videoTrack.track_height,
+        displayAspectWidth: this.videoTrack.track_width,
+        displayAspectHeight: this.videoTrack.track_height,
         description: this._getDescription(
           this.source.getDescriptionBox(VIDEO_STREAM_TYPE)
         ),

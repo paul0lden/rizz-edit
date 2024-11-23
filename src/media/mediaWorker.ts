@@ -4,7 +4,6 @@ import { ClipRenderer } from "@/media/lib/video_renderer";
 import { EventBusManager } from "@/utils/thread";
 import { VideoRenderer } from './render/VideoRenderer'
 import { initGL } from "./render/glInit";
-import { storeClips } from "@/store/clipsStore";
 import { PlaybackManager } from "@/store/playback";
 
 //const audioRenderer = new AudioRenderer();
@@ -12,7 +11,6 @@ import { PlaybackManager } from "@/store/playback";
 const bus = EventBusManager.getInstance("rizz-edit");
 self.addEventListener("message", (e) => console.log(e.data));
 
-const { clips } = storeClips();
 
 let videoRenderer;
 
@@ -23,7 +21,7 @@ self.addEventListener("message", async function(e) {
 
   if (command === "initialize") {
     const gl = initGL(e.data.canvas);
-    videoRenderer = new VideoRenderer(gl, clips);
+    videoRenderer = new VideoRenderer(gl);
   }
 
   //case "play":

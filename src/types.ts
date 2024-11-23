@@ -1,5 +1,6 @@
 import { vec2 } from "gl-matrix";
 import { MP4Demuxer } from "./media/mp4_pull_demuxer";
+import { ClipRenderer } from "./media/lib/video_renderer";
 
 export interface Transform {
   x: number;
@@ -38,6 +39,7 @@ export interface VideoMeta {
 export interface Clip extends ClipMeta {
   buffer: ArrayBuffer,
   demuxer: MP4Demuxer;
+  processor: ClipRenderer;
   width: number;
   height: number;
   texture?: WebGLTexture;
