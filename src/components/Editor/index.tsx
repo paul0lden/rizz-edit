@@ -2,10 +2,9 @@ import React, { useCallback, useRef } from "react";
 import { Play, Pause } from "lucide-react";
 import { HandleType, Transform } from "../../types";
 import { vec2 } from "gl-matrix";
+import { useEventBus } from "@/utils/useEventbus";
 
-const VideoEditor: React.FC<any> = ({
-  canvasRef,
-}) => {
+const VideoEditor: React.FC<any> = ({ canvasRef }) => {
   const dragState = useRef({
     mode: "none" as "none" | "pan" | "drag" | "stretch",
     clipId: null as number | null,
@@ -14,6 +13,31 @@ const VideoEditor: React.FC<any> = ({
     currentPos: vec2.create(),
     activeHandle: HandleType.None,
   });
+  const { emit } = useEventBus();
+
+  const handlePointerEvent = (
+    event: React.PointerEvent<HTMLCanvasElement>,
+    eventName: string
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    emit(eventName, {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      width: rect.width,
+      height: rect.height,
+      containerX: rect.x,
+      containerY: rect.y,
+    });
+  };
+
+  const handlePointerDown = (event) => {
+    handlePointerEvent(event, 'pointerDown')
+  }
+  const handlePointerUp = (event) => {
+    canvasRef.current.
+      handlePointerEvent(event, 'pointerUp')
+  }
 
   return (
     <canvas
@@ -27,10 +51,22 @@ const VideoEditor: React.FC<any> = ({
         }`}
       width={1920}
       height={1080}
-      //onPointerDown={console.log}
-      //onPointerMove={console.log}
-      //onPointerUp={console.log}
-      //onPointerLeave={console.log}
+      onPointerDown={(event) =>
+        emit("pointerDown", { x: event.clientX, y: event.clientY })
+      }
+      onPointerMove={(event) =>
+        emit("pointerMove", { x: event.clientX, y: event.clientY })
+      }
+      onPointerUp={(event) =>
+        emit("pointerUp", {
+          x: event.clientX,
+          y: event.clientY,
+          canvasX: event.currentTarget.getBoundingClientRect(),
+        })
+      }
+      onPointerLeave={(event) =>
+        emit("pointerLeave", { x: event.clientX, y: event.clientY })
+      }
       onContextMenu={(e) => e.preventDefault()}
     />
   );
