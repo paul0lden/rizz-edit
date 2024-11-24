@@ -1,10 +1,12 @@
-import React, { useCallback, useRef } from "react";
+import React, { RefObject, useRef } from "react";
 import { Play, Pause } from "lucide-react";
 import { HandleType, Transform } from "../../types";
 import { vec2 } from "gl-matrix";
 import { useEventBus } from "@/utils/useEventbus";
 
-const VideoEditor: React.FC<any> = ({ canvasRef }) => {
+const VideoEditor: React.FC<{
+  canvasRef: RefObject<HTMLCanvasElement>
+}> = ({ canvasRef }) => {
   const dragState = useRef({
     mode: "none" as "none" | "pan" | "drag" | "stretch",
     clipId: null as number | null,
@@ -19,24 +21,33 @@ const VideoEditor: React.FC<any> = ({ canvasRef }) => {
     event: React.PointerEvent<HTMLCanvasElement>,
     eventName: string
   ) => {
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = canvasRef.current?.getBoundingClientRect();
 
     emit(eventName, {
       pointerX: event.clientX,
       pointerY: event.clientY,
-      width: rect.width,
-      height: rect.height,
-      containerX: rect.x,
-      containerY: rect.y,
+      width: rect?.width,
+      height: rect?.height,
+      containerX: rect?.x,
+      containerY: rect?.y,
+      shiftKey: event.shiftKey,
+      button: event.button,
     });
   };
 
-  const handlePointerDown = (event) => {
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    canvasRef.current?.setPointerCapture(event.pointerId);
     handlePointerEvent(event, 'pointerDown')
   }
-  const handlePointerUp = (event) => {
-    canvasRef.current.
-      handlePointerEvent(event, 'pointerUp')
+  const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    canvasRef.current?.releasePointerCapture(event.pointerId);
+    handlePointerEvent(event, 'pointerUp')
+  }
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    handlePointerEvent(event, 'pointerMove')
+  }
+  const handlePointerLeave = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    handlePointerEvent(event, 'pointerLeave')
   }
 
   return (
@@ -51,22 +62,10 @@ const VideoEditor: React.FC<any> = ({ canvasRef }) => {
         }`}
       width={1920}
       height={1080}
-      onPointerDown={(event) =>
-        emit("pointerDown", { x: event.clientX, y: event.clientY })
-      }
-      onPointerMove={(event) =>
-        emit("pointerMove", { x: event.clientX, y: event.clientY })
-      }
-      onPointerUp={(event) =>
-        emit("pointerUp", {
-          x: event.clientX,
-          y: event.clientY,
-          canvasX: event.currentTarget.getBoundingClientRect(),
-        })
-      }
-      onPointerLeave={(event) =>
-        emit("pointerLeave", { x: event.clientX, y: event.clientY })
-      }
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
       onContextMenu={(e) => e.preventDefault()}
     />
   );

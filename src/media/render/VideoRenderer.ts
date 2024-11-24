@@ -3,6 +3,8 @@ import { mat4 } from "gl-matrix";
 import type { Clip } from "@/types";
 import { Camera } from "./Camera";
 
+import { onPointerUp, onPointerDown, onPointerMove } from './dnd'
+
 import videoVertexShader from "./shaders/video.vertex.glsl?raw";
 import videoFragmentShader from "./shaders/video.fragment.glsl?raw";
 import selectionVertexShader from "./shaders/selection.vertex.glsl?raw";
@@ -50,11 +52,21 @@ export class VideoRenderer {
     const arrays = {
       a_position: {
         numComponents: 3,
-        data: [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0],
+        data: [
+          -1, -1, 0,
+          1, -1, 0,
+          -1, 1, 0,
+          1, 1, 0,
+        ],
       },
       a_texcoord: {
         numComponents: 2,
-        data: [0, 1, 1, 1, 0, 0, 1, 0],
+        data: [
+          0, 1,
+          1, 1,
+          0, 0,
+          1, 0,
+        ],
       },
       indices: [0, 1, 2, 2, 1, 3],
     };
@@ -63,29 +75,17 @@ export class VideoRenderer {
       a_position: {
         numComponents: 3,
         data: [
-          -1,
-          -1,
-          0, // Bottom left
-          1,
-          -1,
-          0, // Bottom right
-          1,
-          1,
-          0, // Top right
-          -1,
-          1,
-          0, // Top left
+          -1, -1, 0, // Bottom left
+          1, -1, 0, // Bottom right
+          1, 1, 0, // Top right
+          -1, 1, 0, // Top left
         ],
       },
       indices: [
-        0,
-        1, // Bottom
-        1,
-        2, // Right
-        2,
-        3, // Top
-        3,
-        0, // Left
+        0, 1, // Bottom
+        1, 2, // Right
+        2, 3, // Top
+        3, 0, // Left
       ],
     };
     const handleSize = 0.02; // Size of the handle squares
@@ -103,18 +103,10 @@ export class VideoRenderer {
 
     handlePositions.forEach(([x, y]) => {
       handles.push(
-        x - handleSize,
-        y - handleSize,
-        0,
-        x + handleSize,
-        y - handleSize,
-        0,
-        x + handleSize,
-        y + handleSize,
-        0,
-        x - handleSize,
-        y + handleSize,
-        0
+        x - handleSize, y - handleSize, 0,
+        x + handleSize, y - handleSize, 0,
+        x + handleSize, y + handleSize, 0,
+        x - handleSize, y + handleSize, 0,
       );
     });
     const handleArrays = {
