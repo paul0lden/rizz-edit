@@ -1,8 +1,5 @@
 import React, { useRef } from "react";
-import { motion } from "framer-motion";
-import type { VideoClip } from "../../types";
-import { Plus, X, Video, Box, Code, Settings } from "lucide-react";
-import { useClips } from "../../store/clips";
+import { useClips } from "@/store/clips";
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -11,9 +8,7 @@ function formatTime(seconds: number): string {
 }
 
 interface VideoTimelineProps {
-  clips: VideoClip[];
   currentTime: number;
-  onAddClip: (file: File) => void;
   onTimeUpdate: (time: number) => void;
   selectedClipId: number | null;
   onClipSelect: (id: number | null) => void;
@@ -52,7 +47,10 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
               accept="video/*"
               className="hidden"
               onChange={(e) =>
-                e.target.files?.[0] && store.addClip(e.target.files[0])
+                e.target.files?.[0] &&
+                store.addFiles({
+                  files: [...e.target.files],
+                })
               }
             />
           </label>
@@ -67,26 +65,26 @@ export const VideoTimeline: React.FC<VideoTimelineProps> = ({
         className="relative h-20 bg-gray-700 rounded cursor-pointer"
         onClick={handleTimelineClick}
       >
-        {store.clips.map((clip) => (
-          <div
-            key={clip.id}
-            className={`absolute h-full rounded transition-colors ${
-              selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
-            }`}
-            style={{
-              left: `${(clip.startTime / duration) * 100}%`,
-              width: `${(clip.duration / duration) * 100}%`,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClipSelect(clip.id);
-            }}
-          >
-            <div className="p-2 text-white text-sm truncate">
-              {clip.fileName}
+        {store.clips.map((clip) => {
+          console.log(clip.duration)
+          return (
+            <div
+              key={clip.id}
+              className={`absolute h-full rounded transition-colors ${selectedClipId === clip.id ? "bg-blue-600" : "bg-blue-500"
+                }`}
+              style={{
+                left: `${(clip.startTime / duration) * 100}%`,
+                width: `${(clip.duration / duration) * 100}%`,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClipSelect(clip.id);
+              }}
+            >
+              <div className="p-2 text-white text-sm truncate">{clip.name}</div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Playhead */}
         <div

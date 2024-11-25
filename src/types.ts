@@ -1,3 +1,7 @@
+import { vec2 } from "gl-matrix";
+import { MP4Demuxer } from "./media/mp4_pull_demuxer";
+import { ClipRenderer } from "./media/lib/video_renderer";
+
 export interface Transform {
   x: number;
   y: number;
@@ -10,20 +14,11 @@ export interface Transform {
   };
 }
 
-export interface BaseClip {
-  id: number;
+export interface ClipMeta {
+  id: string;
   startTime: number;
   duration: number;
-  transform: Transform;
-}
-
-export interface VideoClip extends BaseClip {
-  type: "video";
-  file: File;
-  fileName: string;
-  width: number;
-  height: number;
-  texture?: WebGLTexture;
+  name: string;
   effects: {
     brightness: number;
     contrast: number;
@@ -31,14 +26,35 @@ export interface VideoClip extends BaseClip {
   };
 }
 
-export interface ShaderClip extends BaseClip {
+export interface VideoMeta {
+  width: number;
+  height: number;
+  duration: number;
+  frameCount: number;
+  frameRate: number;
+  codec: string;
+  bitrate: number;
+}
+
+export interface Clip extends ClipMeta {
+  buffer: ArrayBuffer,
+  demuxer: MP4Demuxer;
+  processor: ClipRenderer;
+  width: number;
+  height: number;
+  texture?: WebGLTexture;
+  transform: Transform;
+  framerate: number,
+}
+
+export interface ShaderClip extends ClipMeta, ClipMeta {
   type: "shader";
   shaderType: "gradient" | "noise" | "custom";
   fragmentShader: string;
   uniforms: Record<string, number | number[]>;
 }
 
-export type TimelineObject = VideoClip | ShaderClip;
+export type TimelineObject = Clip | ShaderClip;
 
 export interface TimelineTrack {
   id: number;

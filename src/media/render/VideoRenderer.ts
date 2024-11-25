@@ -1,87 +1,51 @@
-import * as twgl from 'twgl.js';
-import { mat4 } from 'gl-matrix';
-import type { VideoClip } from '../../types';
-import { Camera } from './Camera';
+import * as twgl from "twgl.js";
+import { mat4 } from "gl-matrix";
+import type { Clip } from "@/types";
+import { Camera } from "./Camera";
 
-const videoVertexShader = `#version 300 es
-in vec4 a_position;
-in vec2 a_texcoord;
+import { onPointerUp, onPointerDown, onPointerMove } from './dnd'
 
-uniform mat4 u_projection;
-uniform mat4 u_view;
-uniform mat4 u_model;
-
-out vec2 v_texcoord;
-
-void main() {
-    gl_Position = u_projection * u_view * u_model * a_position;
-    v_texcoord = a_texcoord;
-}`;
-
-const videoFragmentShader = `#version 300 es
-precision highp float;
-
-in vec2 v_texcoord;
-out vec4 outColor;
-
-uniform sampler2D u_texture;
-uniform float u_brightness;
-uniform float u_contrast;
-uniform float u_saturation;
-
-void main() {
-    vec4 color = texture(u_texture, v_texcoord);
-    
-    // Apply effects
-    color.rgb += u_brightness;
-    color.rgb = (color.rgb - 0.5) * u_contrast + 0.5;
-    float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    color.rgb = mix(vec3(luminance), color.rgb, u_saturation);
-    
-    outColor = color;
-}`;
-
-const selectionVertexShader = `#version 300 es
-in vec4 a_position;
-
-uniform mat4 u_projection;
-uniform mat4 u_view;
-uniform mat4 u_model;
-
-void main() {
-    gl_Position = u_projection * u_view * u_model * a_position;
-}`;
-
-const selectionFragmentShader = `#version 300 es
-precision highp float;
-
-out vec4 outColor;
-
-uniform vec4 u_color;
-
-void main() {
-    outColor = u_color;
-}`;
+import videoVertexShader from "./shaders/video.vertex.glsl?raw";
+import videoFragmentShader from "./shaders/video.fragment.glsl?raw";
+import selectionVertexShader from "./shaders/selection.vertex.glsl?raw";
+import selectionFragmentShader from "./shaders/selection.fragment.glsl?raw";
+import { EventBus, EventBusManager } from "@/utils/thread";
+import { PlaybackManager } from "@/store/playback";
+import { List } from "immutable";
+import { storeClips } from "@/store/clipsStore";
 
 export class VideoRenderer {
   private gl: WebGL2RenderingContext;
   private programInfo: twgl.ProgramInfo;
   private bufferInfo: twgl.BufferInfo;
+  private bus: EventBus<any, any>;
+  private playbackManager: PlaybackManager;
   camera: Camera;
-  //private clipData: 
+  //private clipData:
 
   private selectionProgramInfo: twgl.ProgramInfo;
   private borderBufferInfo: twgl.BufferInfo;
   private handleBufferInfo: twgl.BufferInfo;
 
   constructor(gl: WebGL2RenderingContext) {
+    this.playbackManager = PlaybackManager.getInstance();
+    this.bus = EventBusManager.getInstance("rizz-edit");
+    this.bus.on('play', () => this.playbackManager.play())
+    this.bus.on('pause', () => this.playbackManager.pause())
+
+    const { getClips } = storeClips();
+
     this.gl = gl;
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     // Create program using twgl
-    this.programInfo = twgl.createProgramInfo(gl, [videoVertexShader, videoFragmentShader]);
+    this.programInfo = twgl.createProgramInfo(gl, [
+      videoVertexShader,
+      videoFragmentShader,
+    ]);
     this.selectionProgramInfo = twgl.createProgramInfo(gl, [
       selectionVertexShader,
-      selectionFragmentShader
+      selectionFragmentShader,
     ]);
 
     // Create a quad for video rendering
@@ -111,21 +75,21 @@ export class VideoRenderer {
       a_position: {
         numComponents: 3,
         data: [
-          -1, -1, 0,  // Bottom left
-          1, -1, 0,  // Bottom right
-          1, 1, 0,  // Top right
-          -1, 1, 0,  // Top left
+          -1, -1, 0, // Bottom left
+          1, -1, 0, // Bottom right
+          1, 1, 0, // Top right
+          -1, 1, 0, // Top left
         ],
       },
       indices: [
-        0, 1,  // Bottom
-        1, 2,  // Right
-        2, 3,  // Top
-        3, 0,  // Left
+        0, 1, // Bottom
+        1, 2, // Right
+        2, 3, // Top
+        3, 0, // Left
       ],
     };
     const handleSize = 0.02; // Size of the handle squares
-    const handles = [];
+    const handles = [] as number[];
     const handlePositions = [
       [-1, -1], // Bottom-left
       [0, -1], // Bottom-middle
@@ -152,36 +116,47 @@ export class VideoRenderer {
       },
       indices: Array.from({ length: 8 }, (_, i) => {
         const base = i * 4;
-        return [
-          base, base + 1, base + 2,
-          base, base + 2, base + 3,
-        ];
+        return [base, base + 1, base + 2, base, base + 2, base + 3];
       }).flat(),
     };
     this.borderBufferInfo = twgl.createBufferInfoFromArrays(gl, borderArrays);
     this.handleBufferInfo = twgl.createBufferInfoFromArrays(gl, handleArrays);
 
-    this.camera = new Camera(gl.canvas.width, gl.canvas.height)
+    this.camera = new Camera(gl.canvas.width, gl.canvas.height);
 
     this.bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
+
+    this.bus.on("playbackTime", () => {
+      this.renderFrame(getClips().toArray());
+    });
+    this.bus.on("addClips", () => {
+      this.renderFrame(getClips().toArray());
+    })
+    setTimeout(() => {
+      this.renderFrame(getClips().toArray());
+    }, 100);
   }
 
   public getCameraPosition() {
     return this.camera.getPosition();
   }
 
-  render(clip: VideoClip, selected: VideoClip) {
+  render(clip: Clip, selected: Clip) {
     const gl = this.gl;
 
     gl.useProgram(this.programInfo.program);
 
     // Create model matrix from transform
     const model = mat4.create();
-    mat4.translate(model, model, clip.transform.translation);
-    mat4.rotateX(model, model, clip.transform.rotation[0]);
-    mat4.rotateY(model, model, clip.transform.rotation[1]);
-    mat4.rotateZ(model, model, clip.transform.rotation[2]);
-    mat4.scale(model, model, clip.transform.scale);
+    mat4.translate(model, model, [clip.transform.x, clip.transform.y, 0]);
+    mat4.rotateX(model, model, clip.transform.rotation);
+    mat4.rotateY(model, model, 0);
+    mat4.rotateZ(model, model, 0);
+    mat4.scale(model, model, [
+      clip.transform.scale.x,
+      clip.transform.scale.y,
+      0,
+    ]);
 
     const uniforms = {
       u_projection: this.camera.getProjectionMatrix(),
@@ -205,19 +180,23 @@ export class VideoRenderer {
     };
 
     if (clip.id === selected?.id) {
-      gl.useProgram(this.selectionProgramInfo.program)
+      gl.useProgram(this.selectionProgramInfo.program);
       // Draw border
       gl.lineWidth(1);
       twgl.setBuffersAndAttributes(
         gl,
         this.selectionProgramInfo,
-        this.borderBufferInfo,
+        this.borderBufferInfo
       );
       twgl.setUniforms(this.selectionProgramInfo, borderUniforms);
       gl.drawElements(gl.LINES, 8, gl.UNSIGNED_SHORT, 0);
 
       // Draw handles
-      twgl.setBuffersAndAttributes(gl, this.selectionProgramInfo, this.handleBufferInfo);
+      twgl.setBuffersAndAttributes(
+        gl,
+        this.selectionProgramInfo,
+        this.handleBufferInfo
+      );
       twgl.setUniforms(this.selectionProgramInfo, {
         ...borderUniforms,
         u_color: [1, 1, 1, 1], // White fill for handles
@@ -236,5 +215,28 @@ export class VideoRenderer {
 
       gl.disable(gl.BLEND);
     }
+  }
+
+  renderFrame(clips: Clip[], selectedClipId?: string[]) {
+
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+    const time = this.playbackManager.getCurrentTime()
+
+    clips.forEach((clip) => {
+      const texture = twgl.createTexture(this.gl, {
+        src: clip.processor.getFrame(time * 1000),
+        width: 1,
+        height: 1,
+        min: this.gl.LINEAR,
+        mag: this.gl.LINEAR,
+        wrap: this.gl.CLAMP_TO_EDGE,
+      });
+
+      const selectedClip = clips.find((clip) =>
+        selectedClipId?.includes(clip?.id)
+      );
+      this.render({ ...clip, texture }, selectedClip);
+    });
   }
 }
